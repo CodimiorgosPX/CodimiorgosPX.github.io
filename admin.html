@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Professor</title>
+    <!-- CSS de estilo.css -->
+    <link rel="stylesheet" href="css/estilo.css">
+</head>
+<!-- Estruturação da página de Login EtrLog:1 -->
+<!--EtrAdm:1.1 Container do fundo-->
+
+<body class="fundo">
+    <!--EtrAdm:1.2 Container geral-->
+    <div class="admin-container">
+        <!--EtrAdm:1.3 Cabeçalho-->
+        <div class="admin-header">
+            <!--EtrAdm:1.3.1 título-->
+            <h1>📋 Painel do Professor</h1>
+            <!--EtrAdm:1.3.2 botão de logout-->
+            <button id="logout-admin" class="btn-logout-admin">Sair</button>
+        </div>
+
+        <!--EtrAdm:1.3.3 Mensagem de feedback-->
+        <div id="mensagem-sucesso" class="mensagem-sucesso"></div>
+        <div id="mensagem-erro" class="mensagem-erro"></div>
+
+        <!--EtrAdm:1.4 Seção de criar tarefas-parâmetros da tarefa-->
+        <div class="crud-section">
+            <h2>➕ Criar Nova Tarefa com Questões</h2>
+            <form id="form-criar-tarefa" class="form-criar-tarefa">
+                <!--EtrAdm:1.4.2 Div do título-->
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Título da Tarefa:</label>
+                    <input type="text" id="titulo-tarefa" placeholder="Ex: Física - Leis de Newton" required>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!--EtrAdm:1.4.3 Div da data de entrega-->
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Data de Entrega:</label>
+                        <input type="date" id="data-entrega" required>
+                    </div>
+                    <!--EtrAdm:1.4.4 Div do tipo de tarefa-->
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Tipo de Tarefa:</label>
+                        <!--EtrAdm:1.4.3.2 Bloco de seleção-->
+                        <select id="tipo-tarefa">
+                            <option value="exercicio">Exercício</option>
+                            <option value="prova">Prova</option>
+                            <option value="trabalho">Trabalho</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!--EtrAdm:1.5 Seção de criar tarefas-Questões-->
+                <div class="questoes-container" id="questoes-container">
+                    <!--EtrAdm:1.5.1 Título-->
+                    <h3
+                        style="margin: 25px 0 15px 0; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+                        📝 Questões da Tarefa
+                    </h3>
+
+                    <!--EtrAdm:1.5.2 Template que nem existe-->
+                    <div class="questao-item" id="questao-template" style="display: none;">
+                        <div class="questao-header">
+                            <span class="questao-numero">Questão #1</span>
+                            <button type="button" class="btn-remover-questao" onclick="removerQuestao(this)">🗑️
+                                Remover</button>
+                        </div>
+                        <!--EtrAdm:1.5.2 Template que nem existe-->
+                        <div style="margin-bottom: 15px;">
+                            <!--EtrAdm:1.5.3 Enunciado-->
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Enunciado:</label>
+                            <textarea class="enunciado-questao" placeholder="Digite o enunciado da questão..." rows="3"
+                                style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white;"></textarea>
+                        </div>
+                        <!--EtrAdm:1.5.4.1 tipo de resposta-->
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Tipo de
+                                Resposta:</label>
+                            <!--EtrAdm:1.5.4.2 select das opções-->
+                            <select class="tipo-questao" onchange="alterarTipoQuestao(this)"
+                                style="width: 100%; padding: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white;">
+                                <option value="texto">Resposta Textual</option>
+                                <option value="multipla_escolha">Múltipla Escolha</option>
+                                <option value="verdadeiro_falso">Verdadeiro ou Falso</option>
+                            </select>
+                        </div>
+
+                        <!--EtrAdm:1.5.4.3 Caso seja múltipla escolha-->
+                        <div class="alternativas-container" style="display: none; margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Alternativas:</label>
+                            <div class="alternativas-lista">
+                                <div class="alternativa-item">
+                                    <input type="text" class="alternativa-texto" placeholder="Alternativa A"
+                                        style="flex: 1; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: white;">
+                                    <input type="radio" class="alternativa-correta" name="correta_template"
+                                        style="margin-left: 10px;">
+                                    <span style="margin-left: 5px; font-size: 14px;">Correta</span>
+                                </div>
+                                <button type="button" class="btn-add-alternativa"
+                                    style="margin-top: 10px; padding: 8px 15px; background: rgba(76, 175, 80, 0.2); color: #4CAF50; border: 1px solid rgba(76, 175, 80, 0.4); border-radius: 5px; cursor: pointer;">
+                                    + Adicionar Alternativa
+                                </button>
+                            </div>
+                        </div>
+                        <!--EtrAdm:1.5.5 Pontos atribuídos a questão-->
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Pontos:</label>
+                            <input type="number" class="pontos-questao" min="0.5" max="10" step="0.5" value="1.0"
+                                style="width: 100px; padding: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white;">
+                        </div>
+
+                        <!--EtrAdm:1.5.6 marking Scheme-->
+                        <div style="margin-top: 15px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">
+                                📝 Marking Scheme / Resposta Esperada:
+                            </label>
+                            <textarea class="marking-scheme"
+                                placeholder="Descreva aqui a resposta ideal ou critérios de correção. O aluno verá isso após você corrigir."
+                                rows="3"
+                                style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; font-family: Arial, sans-serif;">
+                        </textarea>
+                            <small style="opacity: 0.7; font-size: 12px; display: block; margin-top: 5px;">
+                                ⓘ O aluno só verá esta informação após você corrigir a questão.
+                            </small>
+                        </div>
+                        <!-- ==================================== -->
+                    </div>
+
+                    <!--EtrAdm:1.6 Lista de questões já criadas-->
+                    <div id="lista-questoes"></div>
+
+                    <!--EtrAdm:1.6.1 Botão para criar questões-->
+                    <button type="button" id="btn-add-questao" class="btn-secundario"
+                        style="margin-top: 20px; padding: 12px 25px;">
+                        ➕ Adicionar Nova Questão
+                    </button>
+                </div>
+
+                <!--EtrAdm:1.6.2 Espaço para total de questões e total de pontos-->
+                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 16px;">
+                        <span><strong>Total de Questões:</strong> <span id="total-questoes">0</span></span>
+                        <span><strong>Pontuação Total:</strong> <span id="total-pontos">0.0</span> pontos</span>
+                    </div>
+                </div>
+                <!--EtrAdm:1.6.3 Botão para criar a questão-->
+                <button type="submit" class="btn-criar" style="margin-top: 30px;">📤 Criar Tarefa com Questões</button>
+            </form>
+        </div>
+        <!--EtrAdm:1.6.4 Área da lista final-->
+        <div class="crud-section">
+            <h2>📝 Tarefas Criadas</h2>
+            <p id="sem-tarefas" style="text-align: center; padding: 40px; opacity: 0.7; font-style: italic;">
+                Nenhuma tarefa criada ainda.
+            </p>
+            <div id="lista-tarefas" class="lista-tarefas">
+                <!-- Tarefas serão carregadas aqui -->
+            </div>
+        </div>
+
+        <!--EtrAdm:1.7 Botão de correção-->
+        <div style="text-align: center; margin: 30px 0;">
+            <button onclick="mostrarEntregasParaCorrecao()" class="btn-correcao">
+                ✏️ Ver Entregas para Correção
+            </button>
+        </div>
+
+        <!--EtrAdm:1.8 Botão de voltar ao topo, acho que nem tem-->
+        <button id="btn-topo" class="btn-topo" title="Voltar ao topo">↑</button>
+    </div>
+    <!-- JS do admin.js -->
+    <script src="js/admin.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Progresso</title>
+    <!-- CSS de estilo.css -->
+    <link rel="stylesheet" href="css/estilo.css">
+</head>
+<!-- Estruturação da página de Progresso EtrPrs:1 -->
+<!--EtrLog:1.0 Fundo de carta celeste-->
+
+<body class="fundo">
+    <!--EtrLog:1.1 Container da página-->
+    <div class="progresso-container">
+        <!--EtrLog:1.2 Cabeçalho-->
+        <div class="progresso-header">
+            <h1>📈 Meu Progresso Acadêmico</h1>
+            <a href="aluno.html" class="btn-voltar">← Voltar para Dashboard</a>
+        </div>
+
+        <!--EtrLog:1.3 Estatísticas-->
+        <div class="stats-grid">
+            <!--EtrLog:1.3.1 tarefas concluídas-->
+            <div class="stat-card">
+                <div class="stat-titulo">Tarefas Concluídas</div>
+                <div class="stat-numero" id="stat-concluidas">0</div>
+                <div class="stat-desc">de <span id="stat-total">0</span> tarefas</div>
+            </div>
+            <!--EtrLog:1.3.2 tarefas Pendentes-->
+            <div class="stat-card">
+                <div class="stat-titulo">Tarefas Pendentes</div>
+                <div class="stat-numero" id="stat-pendentes">0</div>
+                <div class="stat-desc">para entregar</div>
+            </div>
+            <!--EtrLog:1.3.3 tarefas atrasadas-->
+            <div class="stat-card">
+                <div class="stat-titulo">Tarefas Atrasadas</div>
+                <div class="stat-numero" id="stat-atrasadas">0</div>
+                <div class="stat-desc">precisa atenção</div>
+            </div>
+            <!--EtrLog:1.3.4 Desempenho por matéria-->
+            <div class="stat-card">
+                <div class="stat-titulo">Média Geral</div>
+                <div class="stat-numero" id="stat-media">0.0</div>
+                <div class="stat-desc">pontuação média</div>
+            </div>
+        </div>
+
+        <!--EtrLog:1.4 gráficos-->
+        <div class="grafico-container">
+            <!--EtrLog:1.4.1 div dos gráficos-->
+            <h2>📊 Desempenho por Matéria</h2>
+            <!--EtrLog:1.4.2 gráfico em barra pelo javascript-->
+            <div class="grafico-barras" id="grafico-barras">
+
+            </div>
+        </div>
+
+        <!--EtrLog:1.5 Histórico de tarefas-->
+        <!--EtrLog:1.5.1 div geral-->
+        <div class="historico-container">
+            <!--EtrLog:1.5.2 título-->
+            <h2>📝 Histórico de Entregas</h2>
+            <!--EtrLog:1.5.3 Listas-->
+            <div class="tarefas-lista" id="historico-tarefas">
+                <p style="text-align: center; opacity: 0.7;">Nenhuma entrega registrada ainda.</p>
+            </div>
+        </div>
+
+        <!--EtrLog:1.6 Conquistas-->
+        <div class="historico-container" style="margin-top: 30px;">
+            <h2>🏆 Conquistas</h2>
+            <div class="conquistas-container" id="conquistas">
+                <!-- Conquistas serão carregadas por JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JS de progresso.js -->
+    <script src="js/progresso.js"></script>
+</body>
+
+</html>

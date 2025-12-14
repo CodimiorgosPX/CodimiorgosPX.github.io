@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Tarefas</title>
+    <!-- CSS de estilo.css -->
+    <link rel="stylesheet" href="css/estilo.css">
+</head>
+<!-- Estruturação da página de Tarefas EtrTrf:1 -->
+<!-- EtrTrf:1.1 fundo de carta celeste -->
+
+<body class="fundo">
+    <!-- EtrTrf:1.2 container de tarefas -->
+    <div class="tarefas-container">
+        <!-- EtrTrf:1.3 Cabeçalho e título -->
+        <div class="tarefas-header">
+            <h1>📚 Minhas Tarefas</h1>
+            <a href="aluno.html" class="btn-voltar">← Voltar</a>
+        </div>
+
+        <!-- EtrTrf:1.4 Lista de tarefas alunos -->
+        <div id="lista-tarefas-aluno" class="lista-tarefas-aluno">
+            <!-- As tarefas serão carregadas aqui pelo JavaScript -->
+            <div class="sem-tarefas" id="sem-tarefas">
+                <img src="imagens/taurosprime.png" alt="Sem tarefas">
+                <h3>Nenhuma tarefa disponível</h3>
+                <p>Aguarde seu professor criar novas atividades.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- EtrTrf:1.5 Div para responder questões -->
+    <div id="modal-tarefa" style="display: none;">
+        <div class="modal-overlay" onclick="fecharModalTarefa()"></div>
+        <div class="modal-content-tarefa">
+            <div class="modal-header-tarefa">
+                <h2 id="modal-titulo">Título da Tarefa</h2>
+                <button class="modal-close-tarefa" onclick="fecharModalTarefa()">&times;</button>
+            </div>
+
+            <div class="modal-body-tarefa" id="modal-questoes">
+                <!-- Questões serão carregadas aqui -->
+            </div>
+
+            <div class="modal-footer-tarefa">
+                <button onclick="fecharModalTarefa()" class="btn-secundario">Cancelar</button>
+                <button onclick="enviarRespostas()" class="btn-primario">Enviar Respostas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS de tarefas.js-->
+    <script src="js/tarefas.js"></script>
+</body>
+
+</html>

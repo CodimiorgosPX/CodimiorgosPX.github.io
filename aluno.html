@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Área do Aluno</title>
+    <link rel="stylesheet" href="css/estilo.css">
+</head>
+<!-- Estruturação da página de aluno EtrAl:1 -->
+<!-- EtrAl:1.1 fundo da página, foto da carta celeste -->
+
+<body class="fundo">
+
+    <!--EtrAl:1.2 Div da página toda-->
+    <div class="area-aluno">
+        <!--EtrAl:1.2.1 Imagem da Constelação de orion-->
+        <div class="constelacao" id="orion">
+            <a href="orientacoes.html">
+                <img src="imagens/orionprime.png" alt="Constelação de Órion">
+                <span class="tooltip">ORIentações - Clique para ver orientações</span>
+            </a>
+        </div>
+
+        <!--EtrAl:1.2.2 Imagem da Constelação de Tauros-->
+        <div class="constelacao" id="tauros">
+            <a href="tarefas.html">
+                <img src="imagens/taurosprime.png" alt="Constelação de Taurus">
+                <span class="tooltip">Suas TArefas - Clique para ver tarefas</span>
+            </a>
+        </div>
+        <!--EtrAl:1.2.3 Imagem da Constelação de perseus-->
+        <div class="constelacao" id="perseus">
+            <a href="progresso.html">
+                <img src="imagens/perseusprime.png" alt="Constelação de Perseus">
+                <span class="tooltip">PeRogresso - Clique para ver progresso</span>
+            </a>
+        </div>
+
+        <!-- EtrAl:1.3 Botão de logout -->
+        <button id="logout-btn">Sair</button>
+    </div>
+
+
+    <script src="js/aluno.js"></script>
+</body>
+
+</html>
