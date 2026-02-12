@@ -1,48 +1,240 @@
 <!DOCTYPE html>
-<html lang="pt-br">
-
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Sistema Educacional</title>
-    <!-- CSS de estilo.css -->
-    <link rel="stylesheet" href="css/estilo.css">
+    <title>Observatório Virtual - Laboratório Astronômico</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
 </head>
-
 <body>
-    <!-- Estruturação da página de Login EtrLog:1 -->
-    <!--EtrLog:1.1 Container do login-->
-    <div class="login-container">
-        <div class="login-form">
-            <!--EtrLog:1.1.2 Título do Login-->
-            <h2>Login</h2>
-
-            <!-- EtrLog:1.2 Selecionando se você é aluno ou professor -->
-            <div class="form-group">
-                <label for="userType">Sou:</label>
-                <select id="userType">
-                    <option value="aluno">Aluno</option>
-                    <option value="professor">Professor</option>
-                </select>
+    <!-- Tela de Carregamento -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <div class="planet-loader">
+                <div class="orbit">
+                    <div class="satellite"></div>
+                </div>
             </div>
-            <!-- EtrLog:1.3 Input de email senha -->
-            <div class="form-group">
-                <label for="email">Email:</label>
-                <input type="email" id="email" placeholder="aluno@escola.com">
+            <h2>Inicializando Observatório Virtual</h2>
+            <div class="progress-bar">
+                <div class="progress"></div>
             </div>
-
-            <div class="form-group">
-                <label for="password">Senha:</label>
-                <input type="password" id="password" placeholder="Sua senha">
-            </div>
-            <!-- EtrLog:1.4 Botão de entrar -->
-            <button id="login-btn">Entrar</button>
-            <p id="mensagem-erro"></p>
         </div>
     </div>
 
-    <!-- JS de auth.js -->
-    <script src="js/auth.js"></script>
-</body>
+    <!-- Container Principal -->
+    <div id="main-container" class="hidden">
+        <!-- Cabeçalho -->
+        <header class="main-header">
+            <div class="logo-container">
+                <div class="logo">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-planet-ringed"></i>
+                    <i class="fas fa-moon"></i>
+                </div>
+                <h1>Observatório Virtual</h1>
+                <p class="tagline">Laboratório de Astronomia 3D para Educação</p>
+            </div>
 
+            <nav class="main-nav">
+                <button id="btn-home" class="nav-btn active">
+                    <i class="fas fa-home"></i> Início
+                </button>
+                <button id="btn-help" class="nav-btn">
+                    <i class="fas fa-question-circle"></i> Ajuda
+                </button>
+                <button id="btn-settings" class="nav-btn">
+                    <i class="fas fa-cog"></i> Configurações
+                </button>
+            </nav>
+        </header>
+
+        <!-- Conteúdo Principal -->
+        <main class="main-content">
+            <!-- Seção Hero -->
+            <section class="hero-section">
+                <div class="hero-content">
+                    <h2>Explore o Universo em 3D</h2>
+                    <p class="hero-description">
+                        Uma ferramenta educacional interativa para ensino de astronomia.
+                        Selecione uma das opções abaixo para começar sua jornada.
+                    </p>
+
+                    <div class="modules-grid">
+                        <!-- Módulo 1: Treinamento de Céu -->
+                        <div class="module-card" id="module-sftw1">
+                            <div class="module-icon">
+                                <i class="fas fa-star-and-crescent"></i>
+                            </div>
+                            <h3>Treinamento de Céu</h3>
+                            <p class="module-description">
+                                Reconheça constelações e teste seus conhecimentos
+                                astronômicos em tempo real.
+                            </p>
+                            <div class="module-features">
+                                <span><i class="fas fa-check"></i> 88 Constelações</span>
+                                <span><i class="fas fa-check"></i> Sistema de Pontuação</span>
+                                <span><i class="fas fa-check"></i> Timer Educativo</span>
+                            </div>
+                            <button class="btn-module-start" data-module="sftw1">
+                                <i class="fas fa-play"></i> Iniciar Treinamento
+                            </button>
+                        </div>
+
+                        <!-- Módulo 2: Movimentos Planetários -->
+                        <div class="module-card" id="module-smld1">
+                            <div class="module-icon">
+                                <i class="fas fa-globe-americas"></i>
+                            </div>
+                            <h3>Movimentos Planetários</h3>
+                            <p class="module-description">
+                                Visualize precessão, nutação, rotação e translação
+                                em simulações interativas.
+                            </p>
+                            <div class="module-features">
+                                <span><i class="fas fa-check"></i> Precessão Terrestre</span>
+                                <span><i class="fas fa-check"></i> Nutação</span>
+                                <span><i class="fas fa-check"></i> Comparação Temporal</span>
+                            </div>
+                            <button class="btn-module-start" data-module="smld1">
+                                <i class="fas fa-play"></i> Iniciar Simulação
+                            </button>
+                        </div>
+
+                        <!-- Módulo 3: Analema -->
+                        <div class="module-card" id="module-smld2">
+                            <div class="module-icon">
+                                <i class="fas fa-infinity"></i>
+                            </div>
+                            <h3>Análise de Analema</h3>
+                            <p class="module-description">
+                                Estude o fenômeno do analema solar e seus movimentos
+                                componentes.
+                            </p>
+                            <div class="module-features">
+                                <span><i class="fas fa-check"></i> Trajetória Solar</span>
+                                <span><i class="fas fa-check"></i> Controles Individuais</span>
+                                <span><i class="fas fa-check"></i> Visualização 3D</span>
+                            </div>
+                            <button class="btn-module-start" data-module="smld2">
+                                <i class="fas fa-play"></i> Iniciar Análise
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visualização 3D Preview -->
+                <div class="preview-container">
+                    <canvas id="preview-canvas"></canvas>
+                    <div class="preview-controls">
+                        <button id="rotate-preview" class="preview-btn">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                        <button id="zoom-in-preview" class="preview-btn">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button id="zoom-out-preview" class="preview-btn">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                    </div>
+                    <div class="preview-info">
+                        <h4>Visualização ao Vivo</h4>
+                        <p id="preview-text">Sistema Solar - Visão atual</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Seção Informações -->
+            <section class="info-section">
+                <div class="info-card">
+                    <h3><i class="fas fa-graduation-cap"></i> Para Professores</h3>
+                    <p>
+                        Esta ferramenta foi desenvolvida especificamente para o ensino
+                        de astronomia no nível médio e superior. Todos os módulos incluem
+                        opções de configuração para diferentes níveis de dificuldade.
+                    </p>
+                    <a href="#" class="btn-secondary">Guia do Professor</a>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-download"></i> Recursos Adicionais</h3>
+                    <p>
+                        Material complementar disponível para download: planos de aula,
+                        exercícios, e referências bibliográficas para cada módulo.
+                    </p>
+                    <a href="#" class="btn-secondary">Baixar Recursos</a>
+                </div>
+            </section>
+        </main>
+
+        <!-- Rodapé -->
+        <footer class="main-footer">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Observatório Virtual</h4>
+                    <p>Desenvolvido para educação astronômica</p>
+                    <p class="copyright">© 2024 - Todos os direitos reservados</p>
+                </div>
+
+                <div class="footer-section">
+                    <h4>Contato</h4>
+                    <p>Para sugestões ou dúvidas:</p>
+                    <p>professor@observatoriovirtual.edu</p>
+                </div>
+
+                <div class="footer-section">
+                    <h4>Tecnologias</h4>
+                    <div class="tech-icons">
+                        <span class="tech-icon" title="Three.js">
+                            <i class="fas fa-cube"></i> Three.js
+                        </span>
+                        <span class="tech-icon" title="JavaScript">
+                            <i class="fab fa-js"></i> JavaScript
+                        </span>
+                        <span class="tech-icon" title="HTML5">
+                            <i class="fab fa-html5"></i> HTML5
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- =========================================== -->
+    <!-- SCRIPTS - ORDEM CRÍTICA! NÃO ALTERAR! -->
+    <!-- =========================================== -->
+
+  <!-- 1) BIBLIOTECAS EXTERNAS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+
+  <!-- 2) SCENEMANAGER -->
+  <script src="scripts/components/SceneManager.js"></script>
+
+  <!-- 3) SFTW1 (CORE + MÓDULOS BASE) -->
+  <script src="scripts/components/Sftw1_Core.js"></script>
+  <script src="scripts/components/Sftw1_DataLoader.js"></script>
+  <script src="scripts/components/Sftw1_Visualization.js"></script>
+  <script src="scripts/components/Sftw1_Game.js"></script>
+  <script src="scripts/components/Sftw1_UI.js"></script>
+
+  <!-- 4) CATÁLOGOS DE ESTRELAS -->
+  <!-- ✅ NOVO BANCO (HYG 3000) - TEM QUE VIR ANTES DO StarCatalog -->
+  <script src="data/stars/stars_hyg_3000.js"></script>
+
+  <!-- (Opcional) banco leve (se você quiser manter) -->
+  <!-- <script src="data/stars/stars_hyg_1500.js"></script> -->
+
+  <!-- ✅ StarCatalog (lê window.SFTW_STAR_DATA.hyg_3000) -->
+  <script src="scripts/components/Sftw1_StarCatalog.js"></script>
+
+  <!-- 5) LOADER / DEBUG -->
+  <script src="scripts/components/Sftw1_Loader.js"></script>
+  <script src="scripts/components/Sftw1_GeodesicDebug.js"></script>
+
+  <!-- 6) APLICAÇÃO PRINCIPAL (ÚLTIMO) -->
+  <script src="scripts/main.js"></script>
+</body>
 </html>
