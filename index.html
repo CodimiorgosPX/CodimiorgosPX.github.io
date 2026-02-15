@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Observatório Virtual - Laboratório Astronômico</title>
+
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
@@ -78,12 +79,14 @@
                                 <span><i class="fas fa-check"></i> Sistema de Pontuação</span>
                                 <span><i class="fas fa-check"></i> Timer Educativo</span>
                             </div>
-                            <button class="btn-module-start" data-module="sftw1">
+
+                            <!-- HUB puro: link para o app -->
+                            <a class="btn-module-start" href="scripts/apps/planetario/app.html">
                                 <i class="fas fa-play"></i> Iniciar Treinamento
-                            </button>
+                            </a>
                         </div>
 
-                        <!-- Módulo 2: Movimentos Planetários -->
+                        <!-- Módulo 2: Movimentos Planetários (placeholder) -->
                         <div class="module-card" id="module-smld1">
                             <div class="module-icon">
                                 <i class="fas fa-globe-americas"></i>
@@ -98,9 +101,11 @@
                                 <span><i class="fas fa-check"></i> Nutação</span>
                                 <span><i class="fas fa-check"></i> Comparação Temporal</span>
                             </div>
-                            <button class="btn-module-start" data-module="smld1">
+
+                            <!-- Ajuste este link quando o app existir -->
+                            <a class="btn-module-start" href="scripts/apps/smld1/app.html">
                                 <i class="fas fa-play"></i> Iniciar Simulação
-                            </button>
+                            </a>
                         </div>
 
                         <!-- Módulo 3: Analema -->
@@ -118,14 +123,16 @@
                                 <span><i class="fas fa-check"></i> Controles Individuais</span>
                                 <span><i class="fas fa-check"></i> Visualização 3D</span>
                             </div>
-                            <button class="btn-module-start" data-module="smld2">
+
+                            <!-- Ajuste este link quando o app do Analema estiver pronto -->
+                            <a class="btn-module-start" href="scripts/apps/Analema/app.html">
                                 <i class="fas fa-play"></i> Iniciar Análise
-                            </button>
+                            </a>
                         </div>
                     </div>
                 </div>
 
-                <!-- Visualização 3D Preview -->
+                <!-- Visualização 3D Preview (opcional; o HUB pode manter preview) -->
                 <div class="preview-container">
                     <canvas id="preview-canvas"></canvas>
                     <div class="preview-controls">
@@ -203,38 +210,17 @@
     </div>
 
     <!-- =========================================== -->
-    <!-- SCRIPTS - ORDEM CRÍTICA! NÃO ALTERAR! -->
+    <!-- SCRIPTS DO HUB (NÃO CARREGAR APPS AQUI)      -->
     <!-- =========================================== -->
 
-  <!-- 1) BIBLIOTECAS EXTERNAS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <!-- Preview 3D no HUB -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
 
-  <!-- 2) SCENEMANAGER -->
-  <script src="scripts/components/SceneManager.js"></script>
+    <!-- Shared -->
+    <script src="scripts/shared/SceneManager.js"></script>
 
-  <!-- 3) SFTW1 (CORE + MÓDULOS BASE) -->
-  <script src="scripts/components/Sftw1_Core.js"></script>
-  <script src="scripts/components/Sftw1_DataLoader.js"></script>
-  <script src="scripts/components/Sftw1_Visualization.js"></script>
-  <script src="scripts/components/Sftw1_Game.js"></script>
-  <script src="scripts/components/Sftw1_UI.js"></script>
-
-  <!-- 4) CATÁLOGOS DE ESTRELAS -->
-  <!-- ✅ NOVO BANCO (HYG 3000) - TEM QUE VIR ANTES DO StarCatalog -->
-  <script src="data/stars/stars_hyg_3000.js"></script>
-
-  <!-- (Opcional) banco leve (se você quiser manter) -->
-  <!-- <script src="data/stars/stars_hyg_1500.js"></script> -->
-
-  <!-- ✅ StarCatalog (lê window.SFTW_STAR_DATA.hyg_3000) -->
-  <script src="scripts/components/Sftw1_StarCatalog.js"></script>
-
-  <!-- 5) LOADER / DEBUG -->
-  <script src="scripts/components/Sftw1_Loader.js"></script>
-  <script src="scripts/components/Sftw1_GeodesicDebug.js"></script>
-
-  <!-- 6) APLICAÇÃO PRINCIPAL (ÚLTIMO) -->
-  <script src="scripts/main.js"></script>
+    <!-- HUB (loading + preview + modais) -->
+    <script src="scripts/main.js"></script>
 </body>
 </html>
