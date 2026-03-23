@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tabela Periódica | Observatório Virtual</title>
+
+  <style>
+    :root {
+      --bg-1: #06101c;
+      --bg-2: #0b1728;
+      --bg-3: #12243d;
+      --panel: rgba(255, 255, 255, 0.07);
+      --panel-strong: rgba(255, 255, 255, 0.1);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #eef4ff;
+      --muted: #a8b6cb;
+      --accent: #62a8ff;
+      --accent-2: #6ed8ff;
+      --correct: linear-gradient(135deg, #2563eb, #38bdf8);
+      --hidden: rgba(255, 255, 255, 0.07);
+      --hidden-hover: rgba(255, 255, 255, 0.13);
+      --empty: transparent;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+      --success: #7ae6a0;
+      --danger: #ff8b8b;
+      --warning: #ffd166;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(98, 168, 255, 0.16), transparent 28%),
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 20%),
+        linear-gradient(155deg, var(--bg-1), var(--bg-2) 48%, var(--bg-3));
+    }
+
+    body {
+      overflow: auto;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(7, 12, 22, 0.66);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .topbar-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1;
+      letter-spacing: 0.4px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 11px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    #start-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      box-shadow: 0 10px 24px rgba(90, 168, 255, 0.22);
+    }
+
+    .ghost-action-btn {
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .ghost-action-btn:hover {
+      background: rgba(255,255,255,0.10);
+      border-color: rgba(127, 208, 255, 0.28);
+    }
+
+    .ghost-action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      filter: none;
+    }
+
+    .main-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 390px;
+      gap: 18px;
+      padding: 18px;
+      align-items: start;
+    }
+
+    .board-panel,
+    .side-panel {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .board-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .board-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .board-header-text {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .board-header h2 {
+      margin: 0;
+      font-size: 19px;
+    }
+
+    .board-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .status-badge {
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: rgba(90, 168, 255, 0.12);
+      border: 1px solid rgba(90, 168, 255, 0.22);
+      color: #d7e9ff;
+      font-size: 13px;
+      max-width: 330px;
+      text-align: right;
+    }
+
+    .board-wrap {
+      overflow: auto;
+      padding: 22px;
+    }
+
+    .table-shell {
+      width: max-content;
+      min-width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .table-caption {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 920px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      flex: none;
+    }
+
+    .legend-revealed {
+      background: linear-gradient(135deg, #2563eb, #38bdf8);
+    }
+
+    .legend-hidden {
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .legend-empty {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+    }
+
+    .grid-frame {
+      width: max-content;
+      padding: 18px;
+      border-radius: 24px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015)),
+        rgba(5, 12, 22, 0.42);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    #table-grid {
+      display: grid;
+      grid-template-columns: repeat(18, 70px);
+      grid-auto-rows: 70px;
+      gap: 8px;
+      width: max-content;
+      padding-bottom: 8px;
+    }
+
+    .cell {
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6px;
+      user-select: none;
+      transition: transform 0.14s ease, background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease;
+      position: relative;
+      overflow: hidden;
+      font-size: 14px;
+      min-width: 0;
+    }
+
+    .empty {
+      background: var(--empty);
+      border: none;
+      box-shadow: none;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .hidden-slot {
+      background: var(--hidden);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      cursor: pointer;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(4px);
+    }
+
+    .hidden-slot:hover {
+      transform: translateY(-2px) scale(1.02);
+      background: var(--hidden-hover);
+      border-color: rgba(127, 208, 255, 0.35);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
+    }
+
+    .element {
+      background: var(--correct);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      font-weight: 800;
+      color: white;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.24);
+    }
+
+    .element::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.16), transparent 48%);
+      pointer-events: none;
+    }
+
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 16px;
+      overflow: visible;
+      position: sticky;
+      top: 94px;
+    }
+
+    .side-card {
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.045);
+      padding: 16px;
+    }
+
+    .side-card h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+
+    .side-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    #selected-slot {
+      min-height: 44px;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .input-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 15px;
+      font-size: 15px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    }
+
+    input:focus {
+      border-color: rgba(127, 208, 255, 0.45);
+      background: rgba(255,255,255,0.11);
+      box-shadow: 0 0 0 4px rgba(90, 168, 255, 0.10);
+    }
+
+    .hint-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .chip {
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    #feedback {
+      min-height: 24px;
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+
+    .feedback-neutral {
+      color: var(--muted);
+    }
+
+    .feedback-success {
+      color: var(--success);
+    }
+
+    .feedback-error {
+      color: var(--danger);
+    }
+
+    .progress-box {
+      display: grid;
+      gap: 10px;
+    }
+
+    .progress-track {
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #2563eb, #38bdf8, #7fd0ff);
+      border-radius: inherit;
+      transition: width 0.2s ease;
+    }
+
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .tip-list {
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .tip-list span {
+      display: block;
+    }
+
+    #discovery-list {
+      max-height: 220px;
+      overflow: auto;
+      color: var(--muted);
+      line-height: 1.45;
+      margin: 10px 0 0;
+      padding-left: 20px;
+    }
+
+    #discovery-list li {
+      margin-bottom: 6px;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    @media (max-width: 1180px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        position: static;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .board-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      #table-grid {
+        grid-template-columns: repeat(18, 60px);
+        grid-auto-rows: 60px;
+        gap: 6px;
+      }
+
+      .cell {
+        border-radius: 14px;
+        font-size: 13px;
+      }
+
+      .main-layout {
+        padding: 12px;
+      }
+
+      .board-wrap,
+      .side-panel {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .grid-frame {
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="title">Tabela Periódica</h1>
+        <div class="subtitle">Treino interativo de posição, símbolo e nome dos elementos</div>
+      </div>
+
+      <div class="topbar-actions">
+        <button id="start-btn">Iniciar jogo</button>
+      </div>
+    </header>
+
+    <main class="main-layout">
+      <section class="board-panel">
+        <div class="board-header">
+          <div class="board-header-text">
+            <h2>Monte a tabela</h2>
+            <p>
+              Reconstrua a tabela periódica a partir da memória espacial.
+              Os espaços inexistentes ficam invisíveis para a forma real da tabela aparecer melhor.
+            </p>
+          </div>
+
+          <div id="status" class="status-badge">Aguardando carregamento...</div>
+        </div>
+
+        <div class="board-wrap">
+          <div class="table-shell">
+            <div class="table-caption">
+              Clique em um bloco oculto, tente responder pelo símbolo ou nome do elemento e acompanhe seu progresso na lateral.
+            </div>
+
+            <div class="legend">
+              <div class="legend-item">
+                <span class="legend-swatch legend-revealed"></span>
+                <span>Elemento revelado</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-swatch legend-hidden"></span>
+                <span>Bloco oculto</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-swatch legend-empty"></span>
+                <span>Espaço inexistente invisível</span>
+              </div>
+            </div>
+
+            <div class="grid-frame">
+              <div id="table-grid"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-panel">
+        <div class="side-card">
+          <h3>Espaço selecionado</h3>
+          <div id="selected-slot">Nenhum espaço selecionado.</div>
+        </div>
+
+        <div class="side-card">
+          <h3>Responder elemento</h3>
+          <div class="input-wrap">
+            <label for="answer-input">Nome ou símbolo</label>
+            <input
+              id="answer-input"
+              type="text"
+              placeholder="Ex.: Na ou Sódio"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+
+          <div class="hint-row" style="margin-top: 12px;">
+            <span class="chip">Enter para confirmar</span>
+            <span class="chip">Aceita símbolo ou nome</span>
+          </div>
+
+          <div id="feedback" class="feedback-neutral" style="margin-top: 14px;">
+            Selecione um espaço para começar.
+          </div>
+        </div>
+
+        <div class="side-card">
+          <h3>Progresso</h3>
+          <div class="progress-box">
+            <div class="progress-track">
+              <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <div class="progress-labels">
+              <span id="progress-count">0 / 118</span>
+              <span id="progress-percent">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <h3>Estatísticas</h3>
+          <div class="tip-list">
+            <span><strong>Erros:</strong> <span id="stats-errors">0</span></span>
+            <span><strong>Dicas usadas:</strong> <span id="stats-hints">0</span></span>
+            <span><strong>Elementos revelados:</strong> <span id="stats-revealed">0</span></span>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <h3>Ajuda e gabarito</h3>
+          <div class="tip-list">
+            <span>O gabarito de um bloco é liberado depois de várias tentativas erradas naquele espaço.</span>
+          </div>
+          <div class="hint-row" style="margin-top: 12px;">
+            <button id="reveal-btn" class="ghost-action-btn" type="button">Mostrar elemento do bloco</button>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <h3>Ordem de descoberta</h3>
+          <div id="discovery-empty" class="tip-list">
+            <span>Nenhum elemento registrado ainda.</span>
+          </div>
+          <ol id="discovery-list" style="display:none;"></ol>
+        </div>
+
+        <div class="side-card">
+          <h3>Como jogar</h3>
+          <div class="tip-list">
+            <span>• Clique em <strong>Iniciar jogo</strong> para revelar o primeiro elemento.</span>
+            <span>• Depois clique em qualquer <strong>?</strong> da tabela.</span>
+            <span>• Digite o <strong>símbolo</strong> ou o <strong>nome</strong> do elemento.</span>
+            <span>• Quando travar muito em um bloco, use o gabarito liberado por erros.</span>
+          </div>
+        </div>
+
+        <div class="footer-note">
+          Próximo refinamento ideal: separar visualmente lantanídeos e actinídeos com rótulos próprios na renderização.
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

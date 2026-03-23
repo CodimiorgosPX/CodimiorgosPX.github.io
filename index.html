@@ -1,13 +1,32 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Observatório Virtual - Laboratório Astronômico</title>
+    <!-- =========================================== -->
+    <!-- CONFIGURAÇÕES BÁSICAS E METADADOS          -->
+    <!-- =========================================== -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <link rel="stylesheet" href="styles/main.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <title>Observatório Virtual | Hub</title>
+    <meta
+        name="description"
+        content="Hub principal do Observatório Virtual - escolha módulos interativos."
+    />
+
+    <!-- CSS principal do HUB -->
+    <link rel="stylesheet" href="styles/main.css" />
+
+    <!-- Fontes -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;500&display=swap"
+        rel="stylesheet"
+    />
+
+    <!-- Ícones -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
 </head>
 <body>
     <!-- Tela de Carregamento -->
@@ -35,8 +54,10 @@
                     <i class="fas fa-planet-ringed"></i>
                     <i class="fas fa-moon"></i>
                 </div>
-                <h1>Observatório Virtual</h1>
-                <p class="tagline">Laboratório de Astronomia 3D para Educação</p>
+                <div>
+                    <h1>Observatório Virtual</h1>
+                    <p class="tagline">Laboratório de Astronomia 3D para Educação</p>
+                </div>
             </div>
 
             <nav class="main-nav">
@@ -80,13 +101,12 @@
                                 <span><i class="fas fa-check"></i> Timer Educativo</span>
                             </div>
 
-                            <!-- HUB puro: link para o app -->
                             <a class="btn-module-start" href="scripts/apps/planetario/app.html">
                                 <i class="fas fa-play"></i> Iniciar Treinamento
                             </a>
                         </div>
 
-                        <!-- Módulo 2: Movimentos Planetários (placeholder) -->
+                        <!-- Módulo 2: Movimentos Planetários -->
                         <div class="module-card" id="module-smld1">
                             <div class="module-icon">
                                 <i class="fas fa-globe-americas"></i>
@@ -102,7 +122,6 @@
                                 <span><i class="fas fa-check"></i> Comparação Temporal</span>
                             </div>
 
-                            <!-- Ajuste este link quando o app existir -->
                             <a class="btn-module-start" href="scripts/apps/smld1/app.html">
                                 <i class="fas fa-play"></i> Iniciar Simulação
                             </a>
@@ -124,15 +143,35 @@
                                 <span><i class="fas fa-check"></i> Visualização 3D</span>
                             </div>
 
-                            <!-- Ajuste este link quando o app do Analema estiver pronto -->
                             <a class="btn-module-start" href="scripts/apps/Analema/app.html">
                                 <i class="fas fa-play"></i> Iniciar Análise
+                            </a>
+                        </div>
+
+                        <!-- Módulo 4: Tabela Periódica -->
+                        <div class="module-card" id="module-tabelaperiodica">
+                            <div class="module-icon">
+                                <i class="fas fa-table-cells-large"></i>
+                            </div>
+                            <h3>Tabela Periódica</h3>
+                            <p class="module-description">
+                                Monte a tabela periódica a partir de um elemento inicial
+                                e treine posição, símbolo e nome dos elementos.
+                            </p>
+                            <div class="module-features">
+                                <span><i class="fas fa-check"></i> Posição dos Elementos</span>
+                                <span><i class="fas fa-check"></i> Nome e Símbolo</span>
+                                <span><i class="fas fa-check"></i> Treino Interativo</span>
+                            </div>
+
+                            <a class="btn-module-start" href="scripts/apps/TabelaPeriodica/app.html">
+                                <i class="fas fa-play"></i> Iniciar Treinamento
                             </a>
                         </div>
                     </div>
                 </div>
 
-                <!-- Visualização 3D Preview (opcional; o HUB pode manter preview) -->
+                <!-- Visualização 3D Preview -->
                 <div class="preview-container">
                     <canvas id="preview-canvas"></canvas>
                     <div class="preview-controls">
@@ -209,10 +248,6 @@
         </footer>
     </div>
 
-    <!-- =========================================== -->
-    <!-- SCRIPTS DO HUB (NÃO CARREGAR APPS AQUI)      -->
-    <!-- =========================================== -->
-
     <!-- Preview 3D no HUB -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
@@ -220,7 +255,7 @@
     <!-- Shared -->
     <script src="scripts/shared/SceneManager.js"></script>
 
-    <!-- HUB (loading + preview + modais) -->
+    <!-- HUB -->
     <script src="scripts/main.js"></script>
 </body>
 </html>
