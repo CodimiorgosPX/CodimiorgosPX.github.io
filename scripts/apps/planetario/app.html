@@ -2,82 +2,165 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+  />
   <title>Planetário OBA</title>
 
   <style>
+    :root {
+      --app-height: 100dvh;
+      --panel-gap: 12px;
+      --panel-padding: 12px;
+      --mobile-controls-max: 42dvh;
+      --mobile-canvas-min: 42dvh;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+    }
+
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
-      height: 100%;
-      overflow: hidden;
+      min-height: 100%;
       background: #000;
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+      touch-action: manipulation;
     }
 
-    /* Layout esperado pela UI (module-content / module-controls / canvas-container) */
+    body {
+      height: var(--app-height);
+      color: #fff;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     .module-content {
       width: 100%;
-      height: 100%;
+      height: var(--app-height);
       display: flex;
       flex-direction: row;
-      gap: 12px;
+      gap: var(--panel-gap);
       align-items: stretch;
+      padding:
+        max(8px, var(--safe-top))
+        max(8px, var(--safe-right))
+        max(8px, var(--safe-bottom))
+        max(8px, var(--safe-left));
     }
 
     .module-controls {
       width: clamp(320px, 30vw, 460px);
       min-width: 300px;
       max-width: 520px;
-      padding: 12px;
-      box-sizing: border-box;
+      padding: var(--panel-padding);
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      min-height: 0;
     }
 
     .canvas-container {
       flex: 1 1 auto;
       min-width: 0;
+      min-height: 0;
       height: 100%;
       position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
     }
 
-    /* Canvas ocupa o container todo */
     #module-canvas {
       width: 100%;
       height: 100%;
       display: block;
+      touch-action: none;
+      background: #000;
     }
 
-    /* Em telas pequenas, vira coluna */
+    .loading-controls {
+      color: rgba(220, 235, 255, 0.9);
+      font-size: 13px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+
     @media (max-width: 900px) {
+      html, body {
+        overflow: auto;
+      }
+
+      body {
+        min-height: var(--app-height);
+      }
+
       .module-content {
+        height: auto;
+        min-height: var(--app-height);
         flex-direction: column;
+        gap: 10px;
+        padding:
+          max(8px, var(--safe-top))
+          max(8px, var(--safe-right))
+          max(8px, var(--safe-bottom))
+          max(8px, var(--safe-left));
       }
 
       .module-controls {
         width: 100%;
+        min-width: 0;
         max-width: none;
+        max-height: var(--mobile-controls-max);
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 10px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(6px);
       }
 
       .canvas-container {
-        height: calc(100vh - 12px);
+        width: 100%;
+        min-height: var(--mobile-canvas-min);
+        height: calc(var(--app-height) - var(--mobile-controls-max) - 28px);
+        flex: 1 1 auto;
       }
     }
 
-    /* Placeholder de loading (opcional) */
-    .loading-controls {
-      color: rgba(220, 235, 255, 0.9);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      font-size: 13px;
-      padding: 10px 12px;
-      border: 1px solid rgba(255, 255, 255, 0.10);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.03);
+    @media (max-width: 560px) {
+      :root {
+        --mobile-controls-max: 46dvh;
+        --mobile-canvas-min: 38dvh;
+      }
+
+      .module-content {
+        gap: 8px;
+      }
+
+      .module-controls {
+        padding: 8px;
+      }
+
+      .canvas-container {
+        border-radius: 10px;
+      }
     }
   </style>
 </head>
 
 <body>
-  <!-- Estrutura que a UI espera -->
   <div class="module-content">
     <div class="module-controls">
       <div class="loading-controls">Carregando controles…</div>
@@ -87,6 +170,27 @@
       <canvas id="module-canvas"></canvas>
     </div>
   </div>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+
+      function updateAppHeight() {
+        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        root.style.setProperty('--app-height', `${vh}px`);
+      }
+
+      updateAppHeight();
+
+      window.addEventListener('resize', updateAppHeight);
+      window.addEventListener('orientationchange', updateAppHeight);
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateAppHeight);
+        window.visualViewport.addEventListener('scroll', updateAppHeight);
+      }
+    })();
+  </script>
 
   <!-- ========================= -->
   <!-- 1) THREE + CONTROLS       -->
@@ -105,15 +209,15 @@
   <script src="./src/Sftw1_Core.js"></script>
   <script src="./src/Sftw1_DataLoader.js"></script>
   <script src="./src/Sftw1_Visualization.js"></script>
-  <script src="./src/Sftw1_Game.js"></script>
+  <script src="./src/Sftw1_NeighborGame.js"></script>
+  <script src="./src/Sftw1_Games.js"></script>
+  <script src="./src/Sftw1_MessierGame.js"></script>
   <script src="./src/Sftw1_UI.js"></script>
 
   <!-- ========================= -->
   <!-- 4) DATA (COMMON)          -->
   <!-- ========================= -->
   <script src="../../../data/common/stars/stars_hyg_3000.js"></script>
-
-  <!-- Messier DB (global window.MESSIER_ALL) -->
   <script src="../../../data/common/messier/messier_all.js"></script>
 
   <!-- ========================= -->

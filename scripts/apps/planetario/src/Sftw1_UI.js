@@ -74,7 +74,24 @@ class Sftw1_UI {
             starFilterNamedOnly: null,
             starFilterMagnitudeMax: null,
             starFilterConstellation: null,
-            btnStarRefreshPool: null
+            btnStarRefreshPool: null,
+
+            // Treino de vizinhanças (jogo 2)
+            neighborDifficulty: null,
+            neighborVisualMode: null,
+            neighborSequenceMode: null,
+            neighborAutoAdvance: null,
+            btnStartNeighborTraining: null,
+            btnStopNeighborTraining: null,
+            neighborCurrentTarget: null,
+            neighborExpectedCount: null,
+            neighborRoundTimer: null,
+            neighborAnswerArea: null,
+            btnSubmitNeighborAnswers: null,
+            btnNeighborChooseAnother: null,
+            neighborResultArea: null,
+            neighborSessionHistory: null,
+            neighborStatusPill: null
         };
         
         // Estado da UI
@@ -151,6 +168,11 @@ class Sftw1_UI {
                             <span class="sftw-title-text">Planetário OBA</span>
                         </div>
                         <div class="sftw-subtitle">Explorar · Constelações · Messier · Estrelas</div>
+                        <div style="margin-top:10px;">
+                            <button id="btn-return-hub" class="sftw-btn" type="button" style="background:#b91c1c;color:#fff;border:1px solid rgba(255,255,255,.18);">
+                                <i class="fas fa-house"></i><span>Voltar ao hub</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="sftw-tabs" role="tablist" aria-label="Contexto principal">
@@ -331,6 +353,107 @@ class Sftw1_UI {
                                 <div class="sftw-card-title"><i class="fas fa-lightbulb"></i> Fluxo</div>
                             </div>
                             <div class="sftw-help">No jogo: clique numa região (boundaries) e digite a constelação vizinha.</div>
+                        </div>
+
+                        <div class="sftw-card" id="neighbor-training-section">
+                            <div class="sftw-card-h sftw-card-h-split">
+                                <div class="sftw-card-title"><i class="fas fa-diagram-project"></i> Treino 2 — Limites das Constelações</div>
+                                <div class="sftw-pill sftw-pill-soft" id="neighbor-status-pill">Pronto</div>
+                            </div>
+                            <div class="sftw-help sftw-help-tight">
+                                Escolha uma constelação e responda todas as que fazem limite com ela. Nesta primeira versão, o modo fácil mostra quantas vizinhas existem e cria as caixinhas automaticamente.
+                            </div>
+
+                            <div class="sftw-divider"></div>
+
+                            <div class="sftw-row sftw-row-wrap">
+                                <div style="flex:1 1 220px; min-width: 180px;">
+                                    <div class="sftw-help" style="margin-top:0; margin-bottom:6px;">Dificuldade</div>
+                                    <select id="neighbor-difficulty" class="sftw-input">
+                                        <option value="easy" selected>Fácil — mostra quantas vizinhas existem</option>
+                                        <option value="hidden-count">Livre — não mostra quantas existem</option>
+                                    </select>
+                                </div>
+                                <div style="flex:1 1 220px; min-width: 180px;">
+                                    <div class="sftw-help" style="margin-top:0; margin-bottom:6px;">Visualização</div>
+                                    <select id="neighbor-visual-mode" class="sftw-input">
+                                        <option value="normal" selected>Planetário normal</option>
+                                        <option value="blackout">Planetário desativado (céu escuro)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="sftw-row sftw-row-wrap" style="margin-top:12px;">
+                                <div style="flex:1 1 220px; min-width: 180px;">
+                                    <div class="sftw-help" style="margin-top:0; margin-bottom:6px;">Sequência</div>
+                                    <select id="neighbor-sequence-mode" class="sftw-input">
+                                        <option value="selected" selected>Somente a constelação escolhida</option>
+                                        <option value="alphabetical">Sequência alfabética</option>
+                                        <option value="random">Ordem aleatória</option>
+                                    </select>
+                                </div>
+                                <div style="flex:1 1 220px; min-width: 180px; display:flex; align-items:flex-end;">
+                                    <label class="sftw-toggle" style="margin:0; min-height:46px;">
+                                        <input id="neighbor-auto-advance" type="checkbox">
+                                        <span>Passar automaticamente para a próxima</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="sftw-row sftw-row-wrap" style="margin-top:12px;">
+                                <button id="btn-start-neighbor-training" class="sftw-btn sftw-btn-primary sftw-btn-wide" type="button">
+                                    <i class="fas fa-play"></i><span>Escolher constelação e iniciar</span>
+                                </button>
+                                <button id="btn-stop-neighbor-training" class="sftw-btn sftw-btn-danger sftw-btn-wide" type="button" style="display:none;">
+                                    <i class="fas fa-stop"></i><span>Encerrar treino</span>
+                                </button>
+                            </div>
+
+                            <div class="sftw-stats" style="margin-top:12px;">
+                                <div class="sftw-stat">
+                                    <div class="k">Constelação atual</div>
+                                    <div class="v" id="neighbor-current-target">—</div>
+                                </div>
+                                <div class="sftw-stat">
+                                    <div class="k">Quantidade esperada</div>
+                                    <div class="v" id="neighbor-expected-count">—</div>
+                                </div>
+                                <div class="sftw-stat">
+                                    <div class="k">Tempo da rodada</div>
+                                    <div class="v" id="neighbor-round-timer">00:00</div>
+                                </div>
+                            </div>
+
+                            <div class="sftw-divider"></div>
+
+                            <div id="neighbor-answer-area" class="sftw-neighbor-answer-area">
+                                <div class="sftw-help">Ao iniciar, as respostas aparecem aqui.</div>
+                            </div>
+
+                            <div class="sftw-row sftw-row-wrap" style="margin-top:12px;">
+                                <button id="btn-submit-neighbor-answers" class="sftw-btn sftw-btn-primary" type="button" disabled>
+                                    <i class="fas fa-check"></i><span>Corrigir respostas</span>
+                                </button>
+                                <button id="btn-neighbor-choose-another" class="sftw-btn" type="button">
+                                    <i class="fas fa-repeat"></i><span>Treinar outra constelação</span>
+                                </button>
+                            </div>
+
+                            <div class="sftw-divider"></div>
+
+                            <div id="neighbor-result-area" class="sftw-neighbor-result-area">
+                                <div class="sftw-help">Depois da correção, aparecem aqui os acertos, erros e faltantes.</div>
+                            </div>
+
+                            <div class="sftw-divider"></div>
+
+                            <div class="sftw-card-h sftw-card-h-split" style="margin-bottom:8px;">
+                                <div class="sftw-card-title"><i class="fas fa-clock-rotate-left"></i> Histórico da sessão</div>
+                                <span class="muted">constelações treinadas nesta sessão</span>
+                            </div>
+                            <div id="neighbor-session-history" class="sftw-checklist">
+                                <div class="sftw-help">Nenhuma constelação treinada ainda.</div>
+                            </div>
                         </div>
                     </div>
 
@@ -625,7 +748,24 @@ class Sftw1_UI {
         this.elements.messierGameProgressBar = document.getElementById('messier-game-progress-bar');
         this.elements.messierDiscoveredList = document.getElementById('messier-discovered-list');
         this.elements.messierLastError = document.getElementById('messier-last-error');
-// Busca e navegação
+
+        // Estrelas
+        this.elements.starInspectorStatus = document.getElementById('star-inspector-status');
+        this.elements.starInspectorName = document.getElementById('star-inspector-name');
+        this.elements.starInspectorConstellation = document.getElementById('star-inspector-constellation');
+        this.elements.starInspectorMagnitude = document.getElementById('star-inspector-magnitude');
+        this.elements.starInspectorRa = document.getElementById('star-inspector-ra');
+        this.elements.starInspectorDec = document.getElementById('star-inspector-dec');
+        this.elements.starInspectorSpectral = document.getElementById('star-inspector-spectral');
+        this.elements.starCatalogTotal = document.getElementById('star-catalog-total');
+        this.elements.starNamedCount = document.getElementById('star-named-count');
+        this.elements.starTrainingPoolCount = document.getElementById('star-training-pool-count');
+        this.elements.starFilterNamedOnly = document.getElementById('star-filter-named-only');
+        this.elements.starFilterMagnitudeMax = document.getElementById('star-filter-magnitude-max');
+        this.elements.starFilterConstellation = document.getElementById('star-filter-constellation');
+        this.elements.btnStarRefreshPool = document.getElementById('btn-star-refresh-pool');
+
+        // Busca e navegação
         this.elements.searchInput = document.getElementById('constellation-search-input');
         this.elements.searchButton = document.getElementById('btn-search-constellation');
         
@@ -643,6 +783,23 @@ class Sftw1_UI {
         this.elements.optShowProgress = document.getElementById('opt-show-progress');
         this.elements.optShowDiscoveredNames = document.getElementById('opt-show-discovered-names');
         this.elements.optShowDiscoveredFill = document.getElementById('opt-show-discovered-fill');
+
+        // Treino de vizinhanças
+        this.elements.neighborDifficulty = document.getElementById('neighbor-difficulty');
+        this.elements.neighborVisualMode = document.getElementById('neighbor-visual-mode');
+        this.elements.neighborSequenceMode = document.getElementById('neighbor-sequence-mode');
+        this.elements.neighborAutoAdvance = document.getElementById('neighbor-auto-advance');
+        this.elements.btnStartNeighborTraining = document.getElementById('btn-start-neighbor-training');
+        this.elements.btnStopNeighborTraining = document.getElementById('btn-stop-neighbor-training');
+        this.elements.neighborCurrentTarget = document.getElementById('neighbor-current-target');
+        this.elements.neighborExpectedCount = document.getElementById('neighbor-expected-count');
+        this.elements.neighborRoundTimer = document.getElementById('neighbor-round-timer');
+        this.elements.neighborAnswerArea = document.getElementById('neighbor-answer-area');
+        this.elements.btnSubmitNeighborAnswers = document.getElementById('btn-submit-neighbor-answers');
+        this.elements.btnNeighborChooseAnother = document.getElementById('btn-neighbor-choose-another');
+        this.elements.neighborResultArea = document.getElementById('neighbor-result-area');
+        this.elements.neighborSessionHistory = document.getElementById('neighbor-session-history');
+        this.elements.neighborStatusPill = document.getElementById('neighbor-status-pill');
         
         console.log('✅ Elementos DOM cacheados');
     }
@@ -655,6 +812,7 @@ class Sftw1_UI {
         
         // Botões do jogo
         this.setupGameEvents();
+        this.setupNeighborGameEvents();
         
         // Controles de visualização
         this.setupVisualizationEvents();
@@ -680,6 +838,7 @@ class Sftw1_UI {
 
         this.setupMessierGameEvents();
         this.refreshMessierGameUI();
+        this.refreshNeighborTrainingUI();
 
         this.setupStarInspectorEvents();
         this.refreshStarTrainingPoolSummary();
@@ -858,6 +1017,53 @@ class Sftw1_UI {
         return `${sign}${String(d).padStart(2, '0')}° ${String(m).padStart(2, '0')}′ ${String(s).padStart(2, '0')}″`;
     }
 
+
+    // ============================================
+    // MOBILE / TABLET - MELHORIAS DE USABILIDADE
+    // ============================================
+
+    setupMobileUIEnhancements() {
+        const updateMobileState = () => {
+            const isMobile = window.matchMedia('(max-width: 900px)').matches;
+            document.body.classList.toggle('sftw-mobile-ui', isMobile);
+
+            if (this.uiContainer) {
+                this.uiContainer.classList.toggle('sftw-mobile-controls', isMobile);
+            }
+        };
+
+        updateMobileState();
+
+        if (this._mobileResizeHandler) {
+            window.removeEventListener('resize', this._mobileResizeHandler);
+        }
+        this._mobileResizeHandler = updateMobileState;
+        window.addEventListener('resize', this._mobileResizeHandler);
+
+        if (window.visualViewport) {
+            if (this._mobileViewportHandler) {
+                window.visualViewport.removeEventListener('resize', this._mobileViewportHandler);
+                window.visualViewport.removeEventListener('scroll', this._mobileViewportHandler);
+            }
+            this._mobileViewportHandler = updateMobileState;
+            window.visualViewport.addEventListener('resize', this._mobileViewportHandler);
+            window.visualViewport.addEventListener('scroll', this._mobileViewportHandler);
+        }
+
+        const focusables = this.uiContainer ? this.uiContainer.querySelectorAll('input, textarea, select, button') : [];
+        focusables.forEach((el) => {
+            el.addEventListener('focus', () => {
+                if (window.matchMedia('(max-width: 900px)').matches) {
+                    setTimeout(() => {
+                        try {
+                            el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+                        } catch (_) {}
+                    }, 120);
+                }
+            });
+        });
+    }
+
     // ============================================
     // CONEXÃO COM O MÓDULO DE JOGO
     // ============================================
@@ -867,51 +1073,130 @@ class Sftw1_UI {
 
     if (this.sftw.registerCallback) {
 
-        // Quando jogo inicia
+        // ---------- Jogo principal (constelações) ----------
         this.sftw.registerCallback('onGameStart', (constellationAbbr) => {
+            this.gameUIState = 'playing';
+            this.updateGameUIState();
             this.onGameStarted(constellationAbbr);
         });
 
-        // Quando constelação é descoberta (feedback apenas)
         this.sftw.registerCallback('onConstellationDiscovered', (abbreviation, attempts) => {
-            this.onConstellationDiscovered(abbreviation, attempts);
+            if (abbreviation && typeof abbreviation === 'object') {
+                this.onConstellationDiscovered(abbreviation.abbr, abbreviation.attempts);
+            } else {
+                this.onConstellationDiscovered(abbreviation, attempts);
+            }
         });
 
-        // Quando jogo termina
         this.sftw.registerCallback('onGameEnd', (result) => {
+            this.gameUIState = 'completed';
+            this.updateGameUIState();
             this.onGameCompleted(result);
         });
 
-        // Quando resposta é errada
         this.sftw.registerCallback('onWrongAnswer', (abbreviation, input) => {
-            this.onWrongAnswer(abbreviation, input);
+            if (abbreviation && typeof abbreviation === 'object') {
+                this.onWrongAnswer(abbreviation.targetAbbr, abbreviation.input);
+            } else {
+                this.onWrongAnswer(abbreviation, input);
+            }
         });
 
-        // 🔴 ÚNICO lugar onde stats são atualizados
+        this.sftw.registerCallback('onCorrectAnswer', (payloadOrAbbr, input) => {
+            // Compatível com assinatura antiga e nova
+            const abbr = (payloadOrAbbr && typeof payloadOrAbbr === 'object')
+                ? (payloadOrAbbr.targetAbbr || payloadOrAbbr.matched || '')
+                : payloadOrAbbr;
+
+            if (abbr) {
+                this.showMessage(`Correto: ${abbr}`, 'success', 1400, {
+                    replaceKey: 'constellation-correct',
+                    replaceActive: true,
+                    skipQueue: true
+                });
+            }
+        });
+
+        // Estado canônico do jogo principal: botão Sair + painel
         this.sftw.registerCallback('onGameStateChange', (gameState) => {
+            this.sftw.gameState = gameState || {};
 
-            // Mantém referência consistente
-            this.sftw.gameState = gameState;
+            if (gameState?.active || gameState?.isGameActive || gameState?.status === 'playing') {
+                this.gameUIState = 'playing';
+            } else if (gameState?.finished || gameState?.status === 'completed') {
+                this.gameUIState = 'completed';
+            } else if (gameState?.status === 'selecting') {
+                this.gameUIState = 'selecting';
+            } else {
+                this.gameUIState = 'idle';
+            }
 
-            console.log(
-                "🧪 UI onGameStateChange |",
-                "descobertas:", gameState.discoveredCount,
-                "/",
-                gameState.totalConstellations,
-                "| score:", gameState.score,
-                "| elapsed:", gameState.elapsedTime
-            );
+            this.updateGameUIState();
+            this.updateGameStats(gameState || {});
+        });
 
-            this.updateGameStats(gameState);
+        // ---------- Messier ----------
+        const handleMessierState = (state) => {
+            this.onMessierGameStateChanged(state || null);
+        };
+
+        this.sftw.registerCallback('onMessierGameStateChange', handleMessierState);
+        this.sftw.registerCallback('onMessierGameStateChanged', handleMessierState);
+        this.sftw.registerCallback('onMessierGameStart', handleMessierState);
+        this.sftw.registerCallback('onMessierGameEnd', handleMessierState);
+
+        this.sftw.registerCallback('onMessierGameHit', (payload) => {
+            if (payload?.message) {
+                this.showMessage(payload.message, 'success', 1800, {
+                    replaceKey: 'messier-hit',
+                    replaceActive: true,
+                    skipQueue: true
+                });
+            }
+            handleMessierState(payload?.state || null);
+        });
+
+        this.sftw.registerCallback('onMessierGameMiss', (payload) => {
+            if (payload?.message) {
+                this.showMessage(payload.message, 'warning', 2200, {
+                    replaceKey: 'messier-miss',
+                    replaceActive: true,
+                    skipQueue: true
+                });
+            }
+            handleMessierState(payload?.state || null);
+        });
+
+        // ---------- NeighborGame / treino de limites ----------
+        this.sftw.registerCallback('onNeighborGameStateChange', (state) => {
+            this.refreshNeighborTrainingUI(state || null);
+        });
+        this.sftw.registerCallback('onNeighborRoundStart', (round) => {
+            this.onNeighborRoundStart(round || null);
+        });
+        this.sftw.registerCallback('onNeighborRoundSubmitted', (round) => {
+            this.onNeighborRoundSubmitted(round || null);
+        });
+        this.sftw.registerCallback('onNeighborGameEnd', (report) => {
+            this.onNeighborGameEnded(report || null);
         });
 
         console.log('✅ Callbacks registrados no Core');
     }
 
-    if (this.sftw.game) {
-        console.log('✅ Conectado com instância Game existente');
+    if (this.sftw.game || this.sftw?.games?.constellation) {
+        console.log('✅ Conectado com controlador do jogo principal');
     }
 }
+
+    getPrimaryGameController() {
+        return this.sftw?.games?.constellation || this.sftw?.game || null;
+    }
+
+    isPrimaryGameActive() {
+        const game = this.getPrimaryGameController();
+        return !!(game && game.state && game.state.active);
+    }
 
     
     // ============================================
@@ -951,19 +1236,23 @@ class Sftw1_UI {
     startGame() {
         console.log('🎮 UI: Iniciar jogo solicitado');
 
-        // ✅ Captura opções escolhidas antes do jogo
         this.applyGameOptionsToVisualization();
 
-        // Abrir seletor de constelação (UI controla o fluxo de seleção).
-        // Quando o usuário escolher, chamamos sftw.startGame(abbr, difficulty).
         this.openConstellationSelectionModal({
             title: 'Escolha a constelação inicial',
             onSelect: (abbr) => {
                 if (typeof this.sftw.startGame === 'function') {
                     this.sftw.startGame(abbr);
-                } else {
-                    this.showMessage('Sistema de jogo não disponível (startGame)', 'error');
+                    return;
                 }
+
+                const game = this.getPrimaryGameController();
+                if (game && typeof game.startGame === 'function') {
+                    game.startGame(abbr);
+                    return;
+                }
+
+                this.showMessage('Sistema de jogo não disponível (startGame)', 'error');
             }
         });
     }
@@ -976,7 +1265,7 @@ class Sftw1_UI {
             title: 'Escolha uma constelação',
             onSelect: (abbr) => {
                 // Se o jogo estiver ativo, reinicia a partir da nova constelação.
-                if (this.sftw.game && this.sftw.game.state && this.sftw.game.state.active) {
+                if (this.isPrimaryGameActive()) {
                     if (typeof this.sftw.restartGame === 'function') {
                         this.sftw.restartGame();
                     }
@@ -992,7 +1281,7 @@ class Sftw1_UI {
     showAnswerKey() {
         console.log('🔑 UI: Mostrar gabarito solicitado');
         
-        if (this.sftw.game && typeof this.sftw.showAnswerKey === 'function') {
+        if (this.getPrimaryGameController() && typeof this.sftw.showAnswerKey === 'function') {
             this.sftw.showAnswerKey();
         }
     }
@@ -1000,7 +1289,7 @@ class Sftw1_UI {
     restartGame() {
         console.log('🔄 UI: Reiniciar jogo solicitado');
         
-        if (this.sftw.game && typeof this.sftw.restartGame === 'function') {
+        if (this.getPrimaryGameController() && typeof this.sftw.restartGame === 'function') {
             this.sftw.restartGame();
         }
     }
@@ -1008,23 +1297,561 @@ class Sftw1_UI {
     endGame() {
         console.log('🚪 UI: Sair do jogo solicitado');
 
-        // Reset UI de progresso para não "vazar" sessão anterior
         this.resetProgressChecklist?.();
         this.setProgressPanelVisible?.(false);
 
-        if (typeof this.activateMainTab === 'function') this.activateMainTab('explore');
+        this.gameUIState = 'idle';
+        this.updateGameUIState();
 
-        if (this.sftw.game && typeof this.sftw.returnToMainMenu === 'function') {
+        if (this.elements.gameStatus) {
+            this.elements.gameStatus.textContent = 'Pronto';
+        }
+
+        if (typeof this.activateMainTab === 'function') {
+            this.activateMainTab('explore');
+        }
+
+        const game = this.getPrimaryGameController();
+
+        if (game && typeof game.endGame === 'function') {
+            game.endGame();
+            return;
+        }
+
+        if (typeof this.sftw.returnToMainMenu === 'function') {
             this.sftw.returnToMainMenu();
         } else if (window.app && typeof window.app.returnToMainMenu === 'function') {
             window.app.returnToMainMenu();
+        } else if (typeof this.sftw.endGame === 'function') {
+            this.sftw.endGame();
         }
+    }
+
+
+    // ============================================
+    // TREINO 2 — LIMITES DAS CONSTELAÇÕES
+    // ============================================
+
+    getNeighborGameController() {
+        return this.sftw?.games?.neighbor || this.sftw?.neighborGame || null;
+    }
+
+    getCurrentNeighborGameState() {
+        if (typeof this.sftw?.getNeighborGameState === 'function') {
+            const state = this.sftw.getNeighborGameState();
+            if (state && typeof state === 'object') return state;
+        }
+        return {
+            active: false,
+            finished: false,
+            difficulty: this.elements.neighborDifficulty?.value || 'easy',
+            sequenceMode: this.elements.neighborSequenceMode?.value || 'selected',
+            autoAdvance: !!this.elements.neighborAutoAdvance?.checked,
+            visualMode: this.elements.neighborVisualMode?.value || 'normal',
+            currentTarget: null,
+            elapsedTime: 0,
+            roundsCompleted: 0,
+            totalRounds: 0,
+            score: 0,
+            maxScore: 0,
+            accuracyPct: null,
+            pendingTargetsCount: 0,
+            hasSubmittedCurrentRound: false
+        };
+    }
+
+    setupNeighborGameEvents() {
+        if (this.elements.btnStartNeighborTraining) {
+            this.elements.btnStartNeighborTraining.addEventListener('click', () => {
+                this.startNeighborTrainingFromUI();
+            });
+        }
+
+        if (this.elements.btnStopNeighborTraining) {
+            this.elements.btnStopNeighborTraining.addEventListener('click', () => {
+                this.stopNeighborTrainingFromUI();
+            });
+        }
+
+        if (this.elements.btnSubmitNeighborAnswers) {
+            this.elements.btnSubmitNeighborAnswers.addEventListener('click', () => {
+                this.submitNeighborTrainingFromUI();
+            });
+        }
+
+        if (this.elements.btnNeighborChooseAnother) {
+            this.elements.btnNeighborChooseAnother.addEventListener('click', () => {
+                this.startNeighborTrainingFromUI();
+            });
+        }
+    }
+
+    _readNeighborTrainingOptionsFromUI() {
+        return {
+            difficulty: (this.elements.neighborDifficulty?.value || 'easy').toString(),
+            visualMode: (this.elements.neighborVisualMode?.value || 'normal').toString(),
+            sequenceMode: (this.elements.neighborSequenceMode?.value || 'selected').toString(),
+            autoAdvance: !!this.elements.neighborAutoAdvance?.checked
+        };
+    }
+
+    startNeighborTrainingFromUI() {
+        if (typeof this.sftw?.startNeighborGame !== 'function') {
+            this.showMessage('Sistema do treino de limites não está disponível.', 'error');
+            return;
+        }
+
+        const opts = this._readNeighborTrainingOptionsFromUI();
+        this.resetNeighborTrainingPanel();
+
+        const launch = (extra = {}) => {
+            const startOptions = { ...opts, ...extra };
+            const ok = this.sftw.startNeighborGame(startOptions);
+            if (!ok && ok !== undefined) {
+                this.showMessage('Não foi possível iniciar o treino de limites.', 'error');
+                return;
+            }
+
+            if (typeof this.activateMainTab === 'function') {
+                this.activateMainTab('constellations');
+            }
+
+            const msg = startOptions.targetConstellation
+                ? `Treino de limites iniciado para ${startOptions.targetConstellation}.`
+                : (startOptions.sequenceMode === 'alphabetical'
+                    ? 'Treino em sequência alfabética iniciado.'
+                    : 'Treino em sequência aleatória iniciado.');
+
+            this.showMessage(msg, 'success', 1600, {
+                replaceKey: 'neighbor-start',
+                replaceActive: true,
+                skipQueue: true
+            });
+        };
+
+        if (opts.sequenceMode === 'selected') {
+            this.openConstellationSelectionModal({
+                title: 'Escolha a constelação para o treino de limites',
+                onSelect: (abbr) => launch({ targetConstellation: abbr })
+            });
+            return;
+        }
+
+        launch();
+    }
+
+    stopNeighborTrainingFromUI() {
+        if (typeof this.sftw?.endNeighborGame === 'function') {
+            this.sftw.endNeighborGame();
+        }
+        this.restoreNeighborVisualMode();
+        this.refreshNeighborTrainingUI();
+        this.showMessage('Treino de limites encerrado.', 'info', 1500, {
+            replaceKey: 'neighbor-stop',
+            replaceActive: true,
+            skipQueue: true
+        });
+    }
+
+    submitNeighborTrainingFromUI() {
+        if (typeof this.sftw?.submitNeighborAnswer !== 'function') {
+            this.showMessage('Função de correção do treino de limites indisponível.', 'error');
+            return;
+        }
+
+        const state = this.getCurrentNeighborGameState();
+        if (!state?.active || !state.currentTarget) {
+            this.showMessage('Nenhuma rodada ativa do treino de limites.', 'warning');
+            return;
+        }
+
+        let payload = '';
+        if ((this.elements.neighborDifficulty?.value || 'easy') === 'easy') {
+            const inputs = Array.from(this.elements.neighborAnswerArea?.querySelectorAll('.neighbor-answer-input') || []);
+            payload = inputs.map(el => (el.value || '').trim()).filter(Boolean).join(', ');
+        } else {
+            payload = (this.elements.neighborAnswerArea?.querySelector('textarea')?.value || '').trim();
+        }
+
+        const result = this.sftw.submitNeighborAnswer(payload);
+        if (!result) {
+            this.showMessage('Não foi possível corrigir esta rodada.', 'error');
+            return;
+        }
+    }
+
+    refreshNeighborTrainingUI(state = null) {
+        state = state || this.getCurrentNeighborGameState();
+        const active = !!state?.active;
+        const current = state?.currentTarget || null;
+
+        if (this.elements.neighborStatusPill) {
+            if (active) this.elements.neighborStatusPill.textContent = 'Em treino';
+            else if (state?.finished) this.elements.neighborStatusPill.textContent = 'Concluído';
+            else this.elements.neighborStatusPill.textContent = 'Pronto';
+        }
+        if (this.elements.btnStartNeighborTraining) {
+            this.elements.btnStartNeighborTraining.style.display = active ? 'none' : '';
+        }
+        if (this.elements.btnStopNeighborTraining) {
+            this.elements.btnStopNeighborTraining.style.display = active ? '' : 'none';
+        }
+        if (this.elements.btnSubmitNeighborAnswers) {
+            this.elements.btnSubmitNeighborAnswers.disabled = !active || !current || !!state?.hasSubmittedCurrentRound;
+        }
+
+        if (this.elements.neighborCurrentTarget) {
+            if (current?.abbr) {
+                this.elements.neighborCurrentTarget.textContent = `${current.abbr} — ${current.name || current.abbr}`;
+            } else {
+                this.elements.neighborCurrentTarget.textContent = '—';
+            }
+        }
+
+        if (this.elements.neighborExpectedCount) {
+            const visible = current && (current.expectedCountVisible !== false);
+            this.elements.neighborExpectedCount.textContent = visible
+                ? String(current.expectedCount ?? '—')
+                : 'Oculto';
+        }
+
+        if (this.elements.neighborRoundTimer) {
+            const seconds = Number(current?.roundElapsedTime ?? 0);
+            const mm = Math.floor(seconds / 60);
+            const ss = seconds % 60;
+            this.elements.neighborRoundTimer.textContent = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+        }
+
+        if (this.elements.neighborSessionAccuracy) {
+            const pct = Number(state?.accuracyPct);
+            this.elements.neighborSessionAccuracy.textContent = Number.isFinite(pct) ? `${pct.toFixed(0)}%` : '—';
+        }
+
+        if (this.elements.neighborSessionSummary) {
+            const roundsCompleted = Number(state?.roundsCompleted || 0);
+            const totalRounds = Number(state?.totalRounds || 0);
+            const pending = Number(state?.pendingTargetsCount || 0);
+            this.elements.neighborSessionSummary.textContent = roundsCompleted > 0
+                ? `${roundsCompleted}/${totalRounds} concluídas • faltam ${pending}`
+                : 'clique em uma linha para ver o detalhamento';
+        }
+    }
+
+    onNeighborRoundStart(round) {
+        if (!round) return;
+
+        this.renderNeighborAnswerInputs(round);
+        this.renderNeighborTrainingResult(null);
+
+        const state = this.getCurrentNeighborGameState();
+        this.refreshNeighborTrainingUI({
+            ...state,
+            currentTarget: {
+                abbr: round.targetAbbr,
+                name: round.targetName,
+                expectedCount: round.expectedCount,
+                expectedCountVisible: round.expectedCountVisible !== false,
+                roundElapsedTime: 0
+            },
+            active: true,
+            hasSubmittedCurrentRound: false
+        });
+
+        const visualMode = state?.visualMode || this.elements.neighborVisualMode?.value || 'normal';
+        this.applyNeighborVisualMode(visualMode);
+
+        if (visualMode !== 'blackout' && typeof this.sftw?.focusOnConstellation === 'function') {
+            this.sftw.focusOnConstellation(round.targetAbbr);
+        }
+    }
+
+    onNeighborRoundSubmitted(round) {
+        if (!round) return;
+        this.renderNeighborTrainingResult(round);
+        this.appendNeighborHistoryEntry(round);
+        this.refreshNeighborTrainingUI();
+
+        const state = this.getCurrentNeighborGameState();
+        if (state?.active && state?.autoAdvance && Number(state?.pendingTargetsCount || 0) > 0) {
+            this.showMessage('Próxima constelação em sequência automática…', 'info', 1000, {
+                replaceKey: 'neighbor-autoadvance',
+                replaceActive: true,
+                skipQueue: true
+            });
+            clearTimeout(this._neighborAutoAdvanceTimer);
+            this._neighborAutoAdvanceTimer = setTimeout(() => {
+                if (typeof this.sftw?.nextNeighborRound === 'function') {
+                    this.sftw.nextNeighborRound();
+                }
+            }, 900);
+        }
+    }
+
+    onNeighborGameEnded(report) {
+        clearTimeout(this._neighborAutoAdvanceTimer);
+        this.restoreNeighborVisualMode();
+        this.refreshNeighborTrainingUI();
+        if (report?.rounds?.length) {
+            const pct = Number(report?.accuracyPct);
+            const pctText = Number.isFinite(pct) ? ` • ${pct.toFixed(0)}%` : '';
+            this.showMessage(`Treino concluído: ${report.totalScore}/${report.maxScore}${pctText}`, 'success', 2400, {
+                replaceKey: 'neighbor-finished',
+                replaceActive: true,
+                skipQueue: true
+            });
+        }
+    }
+
+    renderNeighborAnswerInputs(round) {
+        if (!this.elements.neighborAnswerArea || !round) return;
+
+        const difficulty = (this.elements.neighborDifficulty?.value || 'easy').toString();
+        if (difficulty === 'easy') {
+            const total = Number(round.expectedCount || 0);
+            let html = '<div class="sftw-help" style="margin-top:0; margin-bottom:10px;">Preencha uma constelação por campo.</div>';
+            html += '<div class="sftw-neighbor-grid">';
+            for (let i = 0; i < total; i++) {
+                html += `
+                    <div class="sftw-neighbor-cell">
+                        <div class="sftw-help" style="margin:0 0 6px 0;">Constelação ${i + 1}</div>
+                        <input type="text" class="sftw-input neighbor-answer-input" placeholder="Ex.: Tau, Gem, Lep...">
+                    </div>
+                `;
+            }
+            html += '</div>';
+            this.elements.neighborAnswerArea.innerHTML = html;
+        } else {
+            this.elements.neighborAnswerArea.innerHTML = `
+                <div class="sftw-help" style="margin-top:0; margin-bottom:10px;">
+                    Digite as constelações separadas por vírgula, Enter ou ponto e vírgula. Neste modo, a quantidade não é mostrada.
+                </div>
+                <textarea class="sftw-input" rows="6" placeholder="Ex.: Tau, Gem, Mon, Lep"></textarea>
+            `;
+        }
+
+        const first = this.elements.neighborAnswerArea.querySelector('input, textarea');
+        if (first) setTimeout(() => first.focus(), 0);
+    }
+
+    renderNeighborTrainingResult(round) {
+        if (!this.elements.neighborResultArea) return;
+
+        if (!round) {
+            this.elements.neighborResultArea.innerHTML = '<div class="sftw-help">Depois da correção, aparecem aqui os acertos, erros e faltantes.</div>';
+            return;
+        }
+
+        const matched = Array.isArray(round.matched) ? round.matched : [];
+        const missing = Array.isArray(round.missing) ? round.missing : [];
+        const invalid = Array.isArray(round.invalid) ? round.invalid : [];
+        const accuracyPct = Number(round.accuracyPct);
+
+        const renderTagList = (items, kind) => {
+            if (!items.length) return `<div class="sftw-help">Nenhum.</div>`;
+            return `<div class="sftw-neighbor-tags">${
+                items.map(item => {
+                    if (typeof item === 'string') return `<span class="sftw-neighbor-tag ${kind}">${item}</span>`;
+                    return `<span class="sftw-neighbor-tag ${kind}">${item.abbr} — ${item.name}</span>`;
+                }).join('')
+            }</div>`;
+        };
+
+        this.elements.neighborResultArea.innerHTML = `
+            <div class="sftw-stats" style="margin-top:0; margin-bottom:12px;">
+                <div class="sftw-stat">
+                    <div class="k">Pontuação</div>
+                    <div class="v">${round.scoreEarned}/${round.maxScore}</div>
+                </div>
+                <div class="sftw-stat">
+                    <div class="k">Acurácia</div>
+                    <div class="v">${Number.isFinite(accuracyPct) ? `${accuracyPct.toFixed(0)}%` : '—'}</div>
+                </div>
+                <div class="sftw-stat">
+                    <div class="k">Tempo</div>
+                    <div class="v">${this.formatNeighborRoundTime(round.elapsedAtSubmit ?? round.submittedAt)}</div>
+                </div>
+            </div>
+
+            <div class="sftw-neighbor-result-block">
+                <div class="sftw-card-title"><i class="fas fa-check-circle"></i> Acertou</div>
+                ${renderTagList(matched, 'ok')}
+            </div>
+            <div class="sftw-neighbor-result-block" style="margin-top:12px;">
+                <div class="sftw-card-title"><i class="fas fa-xmark-circle"></i> Colocou, mas está errado</div>
+                ${renderTagList(invalid, 'bad')}
+            </div>
+            <div class="sftw-neighbor-result-block" style="margin-top:12px;">
+                <div class="sftw-card-title"><i class="fas fa-list-check"></i> Faltou colocar</div>
+                ${renderTagList(missing, 'miss')}
+            </div>
+        `;
+    }
+
+    appendNeighborHistoryEntry(round) {
+        if (!this.elements.neighborSessionHistory || !round) return;
+
+        const empty = this.elements.neighborSessionHistory.querySelector('.sftw-help');
+        if (empty) empty.remove();
+
+        const accuracyPct = Number(round.accuracyPct);
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'sftw-progress-item discovered';
+        row.style.width = '100%';
+        row.style.textAlign = 'left';
+        row.innerHTML = `
+            <span>🧩</span>
+            <span><strong>${round.targetAbbr}</strong> — ${round.targetName}</span>
+            <span style="margin-left:auto; opacity:0.85;">${round.scoreEarned}/${round.maxScore} • ${this.formatNeighborRoundTime(round.elapsedAtSubmit ?? round.submittedAt)}</span>
+        `;
+        row.addEventListener('click', () => this.openNeighborHistoryDetail(round));
+        this.elements.neighborSessionHistory.prepend(row);
+    }
+
+    openNeighborHistoryDetail(round) {
+        if (!round) return;
+
+        let overlay = document.getElementById('sftw-neighbor-history-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'sftw-neighbor-history-overlay';
+            overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:10040; display:flex; align-items:center; justify-content:center; padding:16px;';
+            overlay.innerHTML = `
+                <div style="width:min(760px,96vw); max-height:86vh; overflow:auto; background:rgba(12,16,24,0.97); border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; box-shadow:0 18px 48px rgba(0,0,0,0.48);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
+                        <div class="sftw-card-title"><i class="fas fa-magnifying-glass-chart"></i> Detalhamento da rodada</div>
+                        <button id="btn-close-neighbor-history-detail" class="sftw-btn" type="button">Fechar</button>
+                    </div>
+                    <div id="neighbor-history-detail-body"></div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            overlay.addEventListener('click', (ev) => {
+                if (ev.target === overlay) overlay.style.display = 'none';
+            });
+            overlay.querySelector('#btn-close-neighbor-history-detail')?.addEventListener('click', () => {
+                overlay.style.display = 'none';
+            });
+        }
+
+        const body = overlay.querySelector('#neighbor-history-detail-body');
+        if (body) {
+            const matched = Array.isArray(round.matched) ? round.matched : [];
+            const missing = Array.isArray(round.missing) ? round.missing : [];
+            const invalid = Array.isArray(round.invalid) ? round.invalid : [];
+            const renderTagList = (items, kind) => {
+                if (!items.length) return `<div class="sftw-help">Nenhum.</div>`;
+                return `<div class="sftw-neighbor-tags">${items.map(item => {
+                    if (typeof item === 'string') return `<span class="sftw-neighbor-tag ${kind}">${item}</span>`;
+                    return `<span class="sftw-neighbor-tag ${kind}">${item.abbr} — ${item.name}</span>`;
+                }).join('')}</div>`;
+            };
+            body.innerHTML = `
+                <div class="sftw-stats" style="margin-top:0; margin-bottom:12px;">
+                    <div class="sftw-stat"><div class="k">Constelação</div><div class="v">${round.targetAbbr}</div></div>
+                    <div class="sftw-stat"><div class="k">Pontuação</div><div class="v">${round.scoreEarned}/${round.maxScore}</div></div>
+                    <div class="sftw-stat"><div class="k">Acurácia</div><div class="v">${Number(round.accuracyPct || 0).toFixed(0)}%</div></div>
+                    <div class="sftw-stat"><div class="k">Tempo</div><div class="v">${this.formatNeighborRoundTime(round.elapsedAtSubmit ?? round.submittedAt)}</div></div>
+                </div>
+                <div class="sftw-neighbor-result-block">
+                    <div class="sftw-card-title"><i class="fas fa-check-circle"></i> Acertou</div>
+                    ${renderTagList(matched, 'ok')}
+                </div>
+                <div class="sftw-neighbor-result-block" style="margin-top:12px;">
+                    <div class="sftw-card-title"><i class="fas fa-xmark-circle"></i> Colocou, mas está errado</div>
+                    ${renderTagList(invalid, 'bad')}
+                </div>
+                <div class="sftw-neighbor-result-block" style="margin-top:12px;">
+                    <div class="sftw-card-title"><i class="fas fa-list-check"></i> Faltou colocar</div>
+                    ${renderTagList(missing, 'miss')}
+                </div>
+            `;
+        }
+
+        overlay.style.display = 'flex';
+    }
+
+    resetNeighborTrainingPanel() {
+        clearTimeout(this._neighborAutoAdvanceTimer);
+        if (this.elements.neighborResultArea) {
+            this.elements.neighborResultArea.innerHTML = '<div class="sftw-help">Depois da correção, aparecem aqui os acertos, erros e faltantes.</div>';
+        }
+        if (this.elements.neighborAnswerArea) {
+            this.elements.neighborAnswerArea.innerHTML = '<div class="sftw-help">Ao iniciar, as respostas aparecem aqui.</div>';
+        }
+    }
+
+    formatNeighborRoundTime(totalSeconds) {
+        const value = Number(totalSeconds);
+        if (!Number.isFinite(value)) return '00:00';
+        const mm = Math.floor(value / 60);
+        const ss = value % 60;
+        return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    }
+
+    applyNeighborVisualMode(mode = 'normal') {
+        const desired = String(mode || 'normal');
+        if (desired === this._neighborAppliedVisualMode) return;
+
+        if (!this._neighborVisualSnapshot) {
+            this._neighborVisualSnapshot = {
+                showGrid: !!this.sftw?.settings?.showGrid,
+                showBoundaries: !!this.sftw?.settings?.showBoundaries,
+                showLabels: !!this.sftw?.settings?.showLabels,
+                showStars: !!this.sftw?.settings?.showStars,
+                showMessier: !!this.sftw?.settings?.showMessier
+            };
+        }
+
+        if (desired === 'blackout') {
+            this.sftw.settings.showGrid = false;
+            this.sftw.settings.showBoundaries = false;
+            this.sftw.settings.showLabels = false;
+            this.sftw.settings.showStars = false;
+            this.sftw.settings.showMessier = false;
+        } else if (this._neighborVisualSnapshot) {
+            Object.assign(this.sftw.settings, this._neighborVisualSnapshot);
+        }
+
+        if (this.elements.toggleGrid) this.elements.toggleGrid.checked = !!this.sftw.settings.showGrid;
+        if (this.elements.toggleBoundaries) this.elements.toggleBoundaries.checked = !!this.sftw.settings.showBoundaries;
+        if (this.elements.toggleLabels) this.elements.toggleLabels.checked = !!this.sftw.settings.showLabels;
+        if (this.elements.toggleStars) this.elements.toggleStars.checked = !!this.sftw.settings.showStars;
+        if (this.elements.toggleMessier) this.elements.toggleMessier.checked = !!this.sftw.settings.showMessier;
+
+        if (typeof this.sftw.toggleGrid === 'function') this.sftw.toggleGrid();
+        if (typeof this.sftw.toggleBoundaries === 'function') this.sftw.toggleBoundaries();
+        if (typeof this.sftw.toggleLabels === 'function') this.sftw.toggleLabels();
+        if (typeof this.sftw.toggleStars === 'function') this.sftw.toggleStars();
+        if (typeof this.sftw.toggleMessier === 'function') this.sftw.toggleMessier();
+
+        this._neighborAppliedVisualMode = desired;
+    }
+
+    restoreNeighborVisualMode() {
+        if (!this._neighborVisualSnapshot) return;
+        Object.assign(this.sftw.settings, this._neighborVisualSnapshot);
+
+        if (this.elements.toggleGrid) this.elements.toggleGrid.checked = !!this.sftw.settings.showGrid;
+        if (this.elements.toggleBoundaries) this.elements.toggleBoundaries.checked = !!this.sftw.settings.showBoundaries;
+        if (this.elements.toggleLabels) this.elements.toggleLabels.checked = !!this.sftw.settings.showLabels;
+        if (this.elements.toggleStars) this.elements.toggleStars.checked = !!this.sftw.settings.showStars;
+        if (this.elements.toggleMessier) this.elements.toggleMessier.checked = !!this.sftw.settings.showMessier;
+
+        if (typeof this.sftw.toggleGrid === 'function') this.sftw.toggleGrid();
+        if (typeof this.sftw.toggleBoundaries === 'function') this.sftw.toggleBoundaries();
+        if (typeof this.sftw.toggleLabels === 'function') this.sftw.toggleLabels();
+        if (typeof this.sftw.toggleStars === 'function') this.sftw.toggleStars();
+        if (typeof this.sftw.toggleMessier === 'function') this.sftw.toggleMessier();
+
+        this._neighborAppliedVisualMode = null;
+        this._neighborVisualSnapshot = null;
     }
 
     // ============================================
     // EVENTOS DE VISUALIZAÇÃO
     // ============================================
-    
+
     setupMessierGameEvents() {
         const applyOptions = () => this.applyMessierGameOptions({ silent: true });
 
@@ -2589,33 +3416,26 @@ class Sftw1_UI {
     // ============================================
     
     updateGameUIState() {
-        // Atualizar botões baseado no estado
+        const state = this.gameUIState || 'idle';
+
         const startBtn = this.elements.btnStartGame;
-        const selectBtn = this.elements.btnSelectConstellation;
-        const activeActions = document.getElementById('game-actions-active');
-        const isPlaying = this.gameUIState === 'playing';
+        const endBtn = this.elements.btnEndGame;
+        const statusEl = this.elements.gameStatus;
 
-        switch(this.gameUIState) {
-            case 'idle':
-                if (startBtn) startBtn.disabled = false;
-                if (selectBtn) selectBtn.disabled = false;
-                if (activeActions) activeActions.style.display = 'none';
-                break;
-
-            case 'playing':
-                if (startBtn) startBtn.disabled = true;
-                if (selectBtn) selectBtn.disabled = true;
-                if (activeActions) activeActions.style.display = 'flex';
-                break;
-
-            case 'completed':
-                if (startBtn) startBtn.disabled = false;
-                if (selectBtn) selectBtn.disabled = true;
-                if (activeActions) activeActions.style.display = 'flex';
-                break;
+        if (startBtn) {
+            startBtn.style.display = (state === 'playing' || state === 'selecting') ? 'none' : '';
         }
 
-        this.setContextControlLock(isPlaying);
+        if (endBtn) {
+            endBtn.style.display = (state === 'playing' || state === 'selecting') ? '' : 'none';
+        }
+
+        if (statusEl) {
+            if (state === 'playing') statusEl.textContent = 'Jogando';
+            else if (state === 'selecting') statusEl.textContent = 'Selecionando';
+            else if (state === 'completed') statusEl.textContent = 'Concluído';
+            else statusEl.textContent = 'Pronto';
+        }
     }
 
 
@@ -2957,6 +3777,48 @@ const progressLabel = document.getElementById('game-progress-label');
             }
 
             /* Em telas pequenas, vira coluna */
+            .sftw-neighbor-answer-area,
+            .sftw-neighbor-result-area{
+                border: 1px solid rgba(255,255,255,0.10);
+                border-radius: 12px;
+                background: rgba(255,255,255,0.03);
+                padding: 12px;
+            }
+            .sftw-neighbor-grid{
+                display:grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
+            .sftw-neighbor-cell{
+                min-width: 0;
+            }
+            .sftw-neighbor-tags{
+                display:flex;
+                flex-wrap:wrap;
+                gap: 8px;
+                margin-top: 8px;
+            }
+            .sftw-neighbor-tag{
+                display:inline-flex;
+                align-items:center;
+                gap: 6px;
+                padding: 8px 10px;
+                border-radius: 999px;
+                border: 1px solid rgba(255,255,255,0.12);
+                font-size: 12px;
+                font-weight: 700;
+                color: rgba(235,248,255,0.95);
+            }
+            .sftw-neighbor-tag.ok{ background: rgba(76,175,80,0.18); border-color: rgba(76,175,80,0.35); }
+            .sftw-neighbor-tag.bad{ background: rgba(244,67,54,0.18); border-color: rgba(244,67,54,0.35); }
+            .sftw-neighbor-tag.miss{ background: rgba(255,152,0,0.18); border-color: rgba(255,152,0,0.35); }
+            .sftw-neighbor-result-block{
+                border: 1px solid rgba(255,255,255,0.10);
+                border-radius: 12px;
+                background: rgba(255,255,255,0.03);
+                padding: 10px;
+            }
+
             @media (max-width: 900px){
                 .module-content{
                     flex-direction: column !important;
@@ -3328,6 +4190,115 @@ const progressLabel = document.getElementById('game-progress-label');
                 max-height: 220px;
                 overflow:auto;
             }
+
+            @media (max-width: 900px){
+                .module-content{
+                    flex-direction: column !important;
+                    gap: 10px !important;
+                    min-height: auto !important;
+                }
+                .module-controls{
+                    width: 100% !important;
+                    min-width: 0 !important;
+                    max-width: none !important;
+                    order: 0 !important;
+                    padding: 8px !important;
+                }
+                .sftw-left-panel{
+                    border-radius: 14px;
+                    gap: 10px;
+                }
+                .sftw-brand{
+                    padding: 12px 12px 4px 12px;
+                }
+                .sftw-title{
+                    flex-wrap: wrap;
+                    gap: 8px;
+                }
+                .sftw-title-text{
+                    font-size: 15px;
+                }
+                .sftw-subtitle{
+                    font-size: 11px;
+                }
+                .sftw-tabs{
+                    padding: 0 12px;
+                    gap: 6px;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+                .sftw-tab{
+                    min-height: 46px;
+                    padding: 10px 8px;
+                    font-size: 12px;
+                    -webkit-tap-highlight-color: transparent;
+                    touch-action: manipulation;
+                }
+                .sftw-tabpanel{
+                    padding: 0 12px 0 12px;
+                    max-height: none;
+                }
+                .sftw-card{
+                    padding: 11px;
+                    margin-top: 10px;
+                }
+                .sftw-row{
+                    flex-wrap: wrap;
+                }
+                .sftw-row > *{
+                    flex: 1 1 100%;
+                    min-width: 0;
+                }
+                .sftw-btn-wide{
+                    flex: 1 1 100%;
+                }
+                .sftw-stats{
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 8px;
+                }
+                .sftw-neighbor-grid{
+                    grid-template-columns: 1fr;
+                }
+                .sftw-panel-footer{
+                    padding: 0 12px 12px 12px;
+                }
+                .sftw-input{
+                    min-height: 46px;
+                    font-size: 16px;
+                }
+                .sftw-btn,
+                .sftw-linkbtn,
+                .sftw-chip{
+                    min-height: 46px;
+                    touch-action: manipulation;
+                }
+            }
+
+            @media (max-width: 560px){
+                .sftw-tabs{
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+                .sftw-tab{
+                    min-height: 48px;
+                    font-size: 11px;
+                    gap: 6px;
+                    padding: 10px 6px;
+                }
+                .sftw-card-title{
+                    font-size: 12px;
+                }
+                .sftw-help,
+                .sftw-toggle,
+                .sftw-progress-item{
+                    font-size: 12px;
+                }
+                .sftw-stats{
+                    grid-template-columns: 1fr;
+                }
+                .sftw-pill,
+                .muted{
+                    font-size: 11px;
+                }
+            }
         `;
     }
 
@@ -3387,6 +4358,16 @@ addMessageStyles() {
             if (style) style.remove();
         });
         
+        if (this._mobileResizeHandler) {
+            window.removeEventListener('resize', this._mobileResizeHandler);
+            this._mobileResizeHandler = null;
+        }
+        if (window.visualViewport && this._mobileViewportHandler) {
+            window.visualViewport.removeEventListener('resize', this._mobileViewportHandler);
+            window.visualViewport.removeEventListener('scroll', this._mobileViewportHandler);
+            this._mobileViewportHandler = null;
+        }
+
         // Limpar estado
         this.isUISetup = false;
         this.gameUIState = 'idle';
@@ -3567,7 +4548,7 @@ addMessageStyles() {
         const countEl = document.getElementById('sftw-progress-count');
         if (!countEl) return;
 
-        const discovered = this.sftw.game?.state?.discovered;
+        const discovered = this.getPrimaryGameController()?.state?.discovered;
         let discoveredCount = 0;
         if (discovered && typeof discovered.size === 'number') {
             discoveredCount = discovered.size;

@@ -38,6 +38,24 @@ class Sftw1_Visualization {
         this._messierVisibleBeforeGame = null;
         this._messierWantedDuringGame = null;
 
+        // Jogo do Messier (sessão separada do catálogo visual)
+        this.messierGame = {
+            active: false,
+            finished: false,
+            targetId: null,
+            manualTargetId: null,
+            randomOrder: false,
+            autoAdvance: true,
+            showErrorHint: true,
+            toleranceDeg: 1.2,
+            totalErrors: 0,
+            errorsById: {},
+            discovered: new Set(),
+            orderedIds: [],
+            lastAngleErrorDeg: null,
+            startedAt: 0
+        };
+
         this.gameMode = false;
         this.darkenedObjects = [];
 
@@ -57,6 +75,23 @@ class Sftw1_Visualization {
         this.currentInfoConstellation = null;
         this.currentInfoStar = null;
         this.currentInfoType = null;
+
+        this.messierGame = {
+            active: false,
+            finished: false,
+            targetId: null,
+            manualTargetId: null,
+            randomOrder: false,
+            autoAdvance: true,
+            showErrorHint: true,
+            toleranceDeg: 1.2,
+            totalErrors: 0,
+            errorsById: {},
+            discovered: new Set(),
+            orderedIds: [],
+            lastAngleErrorDeg: null,
+            startedAt: 0
+        };
 
         // Estudo de estrelas (filtros aplicados pela aba "Estrelas")
         this.starStudyFilter = {
@@ -89,6 +124,10 @@ class Sftw1_Visualization {
     // Utilitários de foco (painel)
     // ----------------------------
     // Normaliza siglas e aceita entrada no formato "Nome (Abbr)".
+    getPrimaryGameController() {
+        return this.sftw?.games?.constellation || this.sftw?.game || null;
+    }
+
     _normalizeConstellationAbbr(abbr) {
         if (!abbr) return '';
         const s = String(abbr).trim();
@@ -1613,6 +1652,14 @@ this.buildConstellationClickPolygons();
 
         this.raycaster.setFromCamera(this.mouse, this.sftw.sceneManager.camera);
 
+        // ✅ Sessão do jogo Messier tem prioridade fora do jogo das constelações
+        const messierActive = (typeof this.sftw?.isMessierGameActive === 'function')
+            ? !!this.sftw.isMessierGameActive()
+            : !!this.messierGame?.active;
+        if (!this.gameMode && messierActive) {
+            if (this._processMessierGameClick(event)) return;
+        }
+
                 // ✅ Clique em Messier: mostra info e consome o clique (não spamma)
         // (no modo jogo, Messier não deve interferir no treino de constelações)
         if (!this.gameMode) {
@@ -2106,10 +2153,20 @@ this.buildConstellationClickPolygons();
                 if (k) this.revealedConstellations.add(k);
             });
         }
+
         if (this.gameMode) {
             this._syncBoundaryVisibilityForGame();
             this._syncLabelsVisibilityForGame();
             this._syncFillVisibilityForGame();
+
+            if (Array.isArray(this.starMeshes)) {
+                this.starMeshes.forEach((star) => {
+                    if (!star || !star.userData) return;
+                    const conRaw = star.userData.constellation || star.userData.con || '';
+                    const con = this._normalizeAbbr(conRaw);
+                    star.visible = this.revealedConstellations.has(con);
+                });
+            }
         }
     }
 
@@ -2264,7 +2321,7 @@ this.buildConstellationClickPolygons();
         if (options.showStars && Array.isArray(this.starMeshes)) {
             this.starMeshes.forEach(star => {
                 if (!star || !star.userData) return;
-                const con = star.userData.constellation || star.userData.con;
+                const con = this._normalizeAbbr(star.userData.constellation || star.userData.con || '');
                 if (con === key) star.visible = true;
             });
         }
@@ -2308,53 +2365,37 @@ this.buildConstellationClickPolygons();
         }
     }
     processGameSelection(constellationAbbr, clickPosition) {
-        // Passo 3: pedir palpite (sigla IAU em minúsculo) e revelar se acertar.
-        // ✅ Correção crítica: quando o usuário acerta, precisamos registrar a descoberta no Game
-        // (para discoveredCount/progresso/checklist/pontuação). Antes, este método só revelava visualmente
-        // e mostrava mensagem, sem notificar o módulo Sftw1_Game.
+        // Visualization não decide mais acerto/erro do jogo das constelações.
+        // Ela apenas identifica a constelação clicada e delega para o controlador de jogo.
         if (!constellationAbbr) return;
 
-        // Já revelada? não faz nada
+        // Se já foi revelada visualmente, não reabre o fluxo.
         if (this.revealedConstellations && this.revealedConstellations.has(constellationAbbr)) return;
 
-        const expected = String(constellationAbbr).toLowerCase();
-        const answer = (window.prompt('Digite a sigla IAU em minúsculo (ex: ori):', '') || '').trim().toLowerCase();
-
-        if (!answer) return;
-
-        const isCorrect = (answer === expected);
-
-        if (isCorrect) {
-            // 1) Revela visualmente (mantém comportamento existente)
-            this.revealConstellation(constellationAbbr, { fog: true });
-
-            // 2) ✅ Registra no Game (fonte da verdade para stats/checklist/progresso/pontuação)
-            // Preferimos chamar o método do Game diretamente para não depender de wrappers.
-            if (this.sftw && this.sftw.game && typeof this.sftw.game.discoverConstellation === 'function') {
-                this.sftw.game.discoverConstellation(constellationAbbr);
-            } else if (this.sftw && typeof this.sftw.submitAnswer === 'function') {
-                // Fallback: usa API pública se existir
-                this.sftw.submitAnswer(answer, constellationAbbr);
-            }
-
-            // 3) Mensagem: se o Game existir, ele já emite callbacks/mensagens via UI;
-            // se não existir, mantemos o feedback local para não quebrar o modo "visual-only".
-            if (!(this.sftw && this.sftw.game)) {
-                this.sftw.ui?.showMessage?.(`✅ Correto! ${expected}`, 'success');
-            }
-        } else {
-            // Erro: registra tentativa/punição se o Game estiver ativo, senão mantém feedback local.
-            if (this.sftw && this.sftw.game && typeof this.sftw.game.registerAttempt === 'function') {
-                this.sftw.game.registerAttempt(constellationAbbr, answer);
-            } else if (this.sftw && typeof this.sftw.submitAnswer === 'function') {
-                this.sftw.submitAnswer(answer, constellationAbbr);
-            } else {
-                this.sftw.ui?.showMessage?.('❌ Errou. Tente outra.', 'warning');
-            }
+        const game = this.getPrimaryGameController();
+        if (game && typeof game.handleConstellationClick === 'function') {
+            game.handleConstellationClick(constellationAbbr);
+            return;
         }
+
+        if (typeof this.sftw?.handleConstellationClick === 'function') {
+            this.sftw.handleConstellationClick(constellationAbbr);
+            return;
+        }
+
+        const legacyCallback = this.sftw?.callbacks?.onConstellationClick;
+        if (typeof legacyCallback === 'function') {
+            legacyCallback(constellationAbbr);
+            return;
+        }
+
+        this.sftw?.ui?.showMessage?.(
+            'Controlador do jogo de constelações indisponível.',
+            'warning'
+        );
     }
 
-    
+
     startGameMode(selectedConstellationAbbr) {
         // ✅ Isolar o treino de constelações: Messier NÃO pode aparecer nem capturar clique no modo jogo.
         // Salva o estado atual (ou o "desejado" pela UI) para restaurar depois.
@@ -2533,6 +2574,7 @@ _applyBlackoutView() {
         this.starMeshes.forEach(star => {
             if (star) star.visible = this.sftw.settings.showStars;
         });
+        this.applyStarStudyFilter?.();
         
         this.gridLines.forEach(line => {
             if (line) line.visible = this.sftw.settings.showGrid;
@@ -2921,6 +2963,8 @@ clearGeodesicBoundaries() {
             const canvas = this.sceneManager?.renderer?.domElement || document.getElementById('module-canvas');
             if (canvas) {
                 this._boundMessierClick = (ev) => {
+                    const messierActive = (typeof this.sftw?.isMessierGameActive === 'function') ? !!this.sftw.isMessierGameActive() : !!this.messierGame?.active;
+                    if (messierActive) return;
                     if (!this.messierVisible) return;
 
                     // evita spam por "click" duplicado (alguns browsers disparam após drag)
@@ -2957,6 +3001,301 @@ clearGeodesicBoundaries() {
     }
 
 
+    // ============================================
+    // MESSIER GAME (motor da sessão)
+    // ============================================
+
+    _getMessierGameCatalog() {
+        if (typeof this.sftw?.getMessierAll === 'function') {
+            const arr = this.sftw.getMessierAll();
+            if (Array.isArray(arr)) return arr.slice();
+        }
+        return [];
+    }
+
+    _normalizeMessierId(id) {
+        const raw = String(id || '').trim().toUpperCase().replace(/\s+/g, '');
+        if (!raw) return '';
+        const m = raw.match(/^M?(\d{1,3})$/);
+        if (!m) return raw;
+        return `M${Number(m[1])}`;
+    }
+
+
+    syncMessierGameVisuals(state) {
+        this.initMessierMarkers();
+
+        const g = state || ((this.sftw?.messierGameController && typeof this.sftw.messierGameController.getGameState === 'function')
+            ? this.sftw.messierGameController.getGameState()
+            : null);
+
+        if (!this.messierGroup) return;
+        if (!g || !g.active) {
+            this.messierGroup.visible = !!this.messierVisible;
+            this.messierSprites.forEach((spr) => { if (spr) spr.visible = true; });
+            return;
+        }
+
+        this.messierGroup.visible = true;
+        const discovered = new Set(Array.isArray(g.discovered) ? g.discovered.map((x) => this._normalizeMessierId(x)) : []);
+        this.messierSprites.forEach((spr, id) => {
+            if (!spr) return;
+            spr.visible = discovered.has(this._normalizeMessierId(id));
+        });
+    }
+
+    _buildMessierOrderedIds() {
+        const items = this._getMessierGameCatalog();
+        return items
+            .map(m => this._normalizeMessierId(m.id))
+            .filter(Boolean)
+            .sort((a, b) => {
+                const ai = Number(a.slice(1));
+                const bi = Number(b.slice(1));
+                return ai - bi;
+            });
+    }
+
+    _getMessierDirectionById(id) {
+        const key = this._normalizeMessierId(id);
+        if (!key) return null;
+
+        const item = (typeof this.sftw?.getMessierById === 'function') ? this.sftw.getMessierById(key) : null;
+        if (!item || !Number.isFinite(Number(item.ra)) || !Number.isFinite(Number(item.dec))) return null;
+
+        return this.sftw.raDecToVector3(Number(item.ra), Number(item.dec), 1).normalize();
+    }
+
+    _emitMessierGameState() {
+        if (typeof this.sftw?.ui?.onMessierGameStateChanged === 'function') {
+            this.sftw.ui.onMessierGameStateChanged(this.getMessierGameState());
+        }
+    }
+
+    _syncMessierGameVisibility() {
+        this.initMessierMarkers();
+
+        if (!this.messierGroup) return;
+        if (!this.messierGame.active) {
+            this.messierGroup.visible = !!this.messierVisible;
+            this.messierSprites.forEach((spr) => {
+                if (spr) spr.visible = true;
+            });
+            return;
+        }
+
+        this.messierGroup.visible = true;
+        this.messierSprites.forEach((spr, id) => {
+            if (!spr) return;
+            spr.visible = this.messierGame.discovered.has(id);
+        });
+    }
+
+    _chooseNextMessierTarget() {
+        const g = this.messierGame;
+        const ordered = Array.isArray(g.orderedIds) ? g.orderedIds : [];
+        const remaining = ordered.filter(id => !g.discovered.has(id));
+        if (!remaining.length) {
+            g.targetId = null;
+            g.active = false;
+            g.finished = true;
+            return null;
+        }
+
+        if (g.manualTargetId) {
+            const manual = this._normalizeMessierId(g.manualTargetId);
+            if (manual && !g.discovered.has(manual) && ordered.includes(manual)) {
+                g.targetId = manual;
+                return manual;
+            }
+        }
+
+        const next = g.randomOrder
+            ? remaining[Math.floor(Math.random() * remaining.length)]
+            : remaining[0];
+
+        g.targetId = next;
+        return next;
+    }
+
+    startMessierGame(opts = {}) {
+        if (this.sftw?.messierGameController && typeof this.sftw.messierGameController.startGame === 'function') {
+            return this.sftw.messierGameController.startGame(opts);
+        }
+
+        if (this.gameMode) return false; // fallback antigo
+        const catalog = this._buildMessierOrderedIds();
+        if (!catalog.length) return false;
+
+        const g = this.messierGame;
+        g.active = true;
+        g.finished = false;
+        g.randomOrder = !!opts.randomOrder;
+        g.autoAdvance = (opts.autoAdvance !== undefined) ? !!opts.autoAdvance : true;
+        g.showErrorHint = (opts.showErrorHint !== undefined) ? !!opts.showErrorHint : true;
+        const tol = Number(opts.toleranceDeg);
+        g.toleranceDeg = (Number.isFinite(tol) && tol > 0) ? tol : 1.2;
+        g.manualTargetId = this._normalizeMessierId(opts.manualTargetId || opts.targetId || '');
+        g.totalErrors = 0;
+        g.errorsById = {};
+        g.discovered = new Set();
+        g.orderedIds = catalog;
+        g.lastAngleErrorDeg = null;
+        g.startedAt = Date.now();
+
+        this._chooseNextMessierTarget();
+        this._syncMessierGameVisibility();
+        this._emitMessierGameState();
+        return true;
+    }
+
+    stopMessierGame(opts = {}) {
+        if (this.sftw?.messierGameController && typeof this.sftw.messierGameController.stopGame === 'function') {
+            return this.sftw.messierGameController.stopGame(opts);
+        }
+
+        const g = this.messierGame;
+        if (!g.active && !g.finished) return false;
+
+        g.active = false;
+        g.finished = false;
+        g.targetId = null;
+        g.manualTargetId = null;
+        g.lastAngleErrorDeg = null;
+
+        const restoreVisible = (opts && typeof opts === 'object' && 'restoreVisible' in opts)
+            ? !!opts.restoreVisible
+            : !!this.messierVisible;
+
+        this.messierVisible = restoreVisible;
+        this._syncMessierGameVisibility();
+        this._emitMessierGameState();
+        return true;
+    }
+
+    setMessierGameOptions(opts = {}) {
+        if (this.sftw?.messierGameController && typeof this.sftw.messierGameController.applyConfiguration === 'function') {
+            this.sftw.messierGameController.applyConfiguration(opts);
+            return true;
+        }
+
+        const g = this.messierGame;
+        if ('randomOrder' in opts) g.randomOrder = !!opts.randomOrder;
+        if ('autoAdvance' in opts) g.autoAdvance = !!opts.autoAdvance;
+        if ('showErrorHint' in opts) g.showErrorHint = !!opts.showErrorHint;
+
+        const tol = Number(opts.toleranceDeg);
+        if (Number.isFinite(tol) && tol > 0) g.toleranceDeg = tol;
+
+        if ('manualTargetId' in opts || 'targetId' in opts) {
+            g.manualTargetId = this._normalizeMessierId(opts.manualTargetId || opts.targetId || '');
+            if (g.active) this._chooseNextMessierTarget();
+        }
+
+        this._emitMessierGameState();
+        return true;
+    }
+
+    setMessierGameTarget(id) {
+        if (this.sftw?.messierGameController && typeof this.sftw.messierGameController.setManualTarget === 'function') {
+            return this.sftw.messierGameController.setManualTarget(id);
+        }
+
+        const key = this._normalizeMessierId(id);
+        if (!key) return false;
+
+        const exists = !!this._getMessierDirectionById(key);
+        if (!exists) return false;
+
+        this.messierGame.manualTargetId = key;
+        if (this.messierGame.active) this.messierGame.targetId = key;
+        this._emitMessierGameState();
+        return true;
+    }
+
+    isMessierGameActive() {
+        if (this.sftw?.messierGameController && typeof this.sftw.messierGameController.isActive === 'function') {
+            return !!this.sftw.messierGameController.isActive();
+        }
+        return !!this.messierGame.active;
+    }
+
+    getMessierGameState() {
+        if (this.sftw?.messierGameController && typeof this.sftw.messierGameController.getGameState === 'function') {
+            return this.sftw.messierGameController.getGameState();
+        }
+
+        const g = this.messierGame;
+        const totalCount = Array.isArray(g.orderedIds) && g.orderedIds.length ? g.orderedIds.length : this._buildMessierOrderedIds().length;
+        const discovered = Array.from(g.discovered || []);
+        return {
+            active: !!g.active,
+            finished: !!g.finished,
+            targetId: g.targetId || null,
+            manualTargetId: g.manualTargetId || null,
+            randomOrder: !!g.randomOrder,
+            autoAdvance: !!g.autoAdvance,
+            showErrorHint: !!g.showErrorHint,
+            toleranceDeg: Number(g.toleranceDeg || 1.2),
+            totalErrors: Number(g.totalErrors || 0),
+            errorsById: { ...(g.errorsById || {}) },
+            discovered,
+            discoveredCount: discovered.length,
+            remainingCount: Math.max(0, totalCount - discovered.length),
+            totalCount,
+            lastAngleErrorDeg: g.lastAngleErrorDeg,
+            startedAt: g.startedAt || 0
+        };
+    }
+
+    _processMessierGameClick(event) {
+        const state = this.getMessierGameState();
+        if (!state?.active || !state?.targetId) return false;
+
+        const targetDir = this._getMessierDirectionById(state.targetId);
+        if (!targetDir) return false;
+
+        const canvas = this.sftw.sceneManager.renderer.domElement;
+        const rect = canvas.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        this.raycaster.setFromCamera(this.mouse, this.sftw.sceneManager.camera);
+
+        const clickDir = this._getClickDirFromCurrentRay();
+        if (!clickDir) return false;
+
+        const dot = Math.max(-1, Math.min(1, clickDir.dot(targetDir)));
+        const angDeg = Math.acos(dot) * 180 / Math.PI;
+
+        if (typeof this.sftw?.submitMessierAngleError === 'function') {
+            this.sftw.submitMessierAngleError(angDeg);
+            return true;
+        }
+
+        // Fallback local antigo
+        const g = this.messierGame;
+        if (angDeg <= g.toleranceDeg) {
+            const id = g.targetId;
+            g.discovered.add(id);
+            g.lastAngleErrorDeg = null;
+
+            if (g.autoAdvance) {
+                this._chooseNextMessierTarget();
+            }
+
+            this._syncMessierGameVisibility();
+            this._emitMessierGameState();
+            return true;
+        }
+
+        g.totalErrors += 1;
+        g.errorsById[g.targetId] = Number(g.errorsById[g.targetId] || 0) + 1;
+        g.lastAngleErrorDeg = angDeg;
+        this._emitMessierGameState();
+        return true;
+    }
+
+
     setMessierVisible(isVisible) {
         const want = !!isVisible;
         this.messierVisible = want;
@@ -2972,7 +3311,11 @@ clearGeodesicBoundaries() {
 
         // garante criação (e listeners) antes de aplicar visibilidade
         this.initMessierMarkers();
-        if (this.messierGroup) this.messierGroup.visible = want;
+        if (this.messierGame?.active) {
+            this._syncMessierGameVisibility();
+        } else if (this.messierGroup) {
+            this.messierGroup.visible = want;
+        }
     }
 
     toggleMessier() {
@@ -3114,6 +3457,23 @@ clearGeodesicBoundaries() {
         this.currentInfoStar = null;
         this.currentInfoType = null;
 
+        this.messierGame = {
+            active: false,
+            finished: false,
+            targetId: null,
+            manualTargetId: null,
+            randomOrder: false,
+            autoAdvance: true,
+            showErrorHint: true,
+            toleranceDeg: 1.2,
+            totalErrors: 0,
+            errorsById: {},
+            discovered: new Set(),
+            orderedIds: [],
+            lastAngleErrorDeg: null,
+            startedAt: 0
+        };
+
         // Estudo de estrelas (filtros aplicados pela aba "Estrelas")
         this.starStudyFilter = {
             enabled: false,
@@ -3151,6 +3511,13 @@ if (typeof window !== 'undefined') {
         sftwInstance.toggleMessier = () => visualization.toggleMessier();
         sftwInstance.setMessierVisible = (v) => visualization.setMessierVisible(v);
         sftwInstance.focusOnMessier = (id) => visualization.focusOnMessier(id);
+        sftwInstance.syncMessierGameVisuals = (state) => visualization.syncMessierGameVisuals(state);
+        sftwInstance.startMessierGame = (opts) => visualization.startMessierGame(opts);
+        sftwInstance.stopMessierGame = (opts) => visualization.stopMessierGame(opts);
+        sftwInstance.getMessierGameState = () => visualization.getMessierGameState();
+        sftwInstance.setMessierGameOptions = (opts) => visualization.setMessierGameOptions(opts);
+        sftwInstance.setMessierGameTarget = (id) => visualization.setMessierGameTarget(id);
+        sftwInstance.isMessierGameActive = () => visualization.isMessierGameActive();
         sftwInstance.toggleSegments = () => visualization.toggleSegments();
         
         sftwInstance.hideAllConstellations = () => visualization.hideAllConstellations();

@@ -182,20 +182,20 @@ class Sftw1 {
             // 4) INJEÇÃO ROBUSTA (antes de chamar métodos delegados)
             // =====================================================
             this._injectAllAvailableModules();
+            console.log('ℹ️ Core: composição principal esperada via Loader; injeções locais são apenas fallback.');
 
             // 5) Carregar dados das constelações (precisa do DataLoader injetado)
             await this.loadConstellationData();
 
             // 6) Garantir StarCatalog e MessierCatalog antes da construção visual
-            if (typeof Sftw1.injectStarCatalogMethods === 'function') {
-                // (re)injeção idempotente
+            // O Core só injeta aqui como fallback de segurança, se o Loader ainda não tiver feito isso.
+            if (!this.starCatalog && typeof Sftw1.injectStarCatalogMethods === 'function') {
                 try { Sftw1.injectStarCatalogMethods(this); } catch (e) { /* ignore */ }
             }
 
-            if (typeof Sftw1.injectMessierCatalogMethods === 'function') {
-                // (re)injeção idempotente
+            if (!this.messier && typeof Sftw1.injectMessierCatalogMethods === 'function') {
                 try { Sftw1.injectMessierCatalogMethods(this); } catch (e) { /* ignore */ }
-            } else {
+            } else if (!this.messier) {
                 console.warn('⚠️ MessierCatalog não injetado. Verifique se messier_all.js vem antes do Sftw1_MessierCatalog.js no app.html.');
             }
 
@@ -251,13 +251,18 @@ class Sftw1 {
     // NOVO: INJEÇÃO ROBUSTA (não quebra se módulo faltar)
     // ============================================================
     _injectAllAvailableModules() {
-        console.log('🔗 Injetando módulos disponíveis (modo robusto)...');
+        console.log('🔗 Injetando módulos disponíveis (modo robusto / fallback do Core)...');
 
-        // DataLoader (precisa vir antes de loadConstellationData)
+        // DataLoader (fallback do Core; composição principal fica no Loader)
         if (typeof Sftw1.injectDataLoaderMethods === 'function') {
             try {
-                Sftw1.injectDataLoaderMethods(this);
-                console.log('✅ DataLoader injetado');
+                const hadLoader = typeof this.loadConstellationData === 'function';
+                if (!hadLoader) {
+                    Sftw1.injectDataLoaderMethods(this);
+                    console.log('✅ DataLoader injetado pelo Core (fallback)');
+                } else {
+                    console.log('ℹ️ DataLoader já disponível; Core não reinjeta');
+                }
             } catch (e) {
                 console.warn('⚠️ Falha ao injetar DataLoader:', e);
             }
@@ -265,11 +270,15 @@ class Sftw1 {
             console.warn('⚠️ injectDataLoaderMethods não encontrado (DataLoader pode não estar carregado).');
         }
 
-        // Visualization
+        // Visualization (fallback do Core)
         if (typeof Sftw1.injectVisualizationMethods === 'function') {
             try {
-                Sftw1.injectVisualizationMethods(this);
-                console.log('✅ Visualization injetado');
+                if (!this.visualization) {
+                    Sftw1.injectVisualizationMethods(this);
+                    console.log('✅ Visualization injetado pelo Core (fallback)');
+                } else {
+                    console.log('ℹ️ Visualization já disponível; Core não reinjeta');
+                }
             } catch (e) {
                 console.warn('⚠️ Falha ao injetar Visualization:', e);
             }
@@ -277,11 +286,15 @@ class Sftw1 {
             console.warn('⚠️ injectVisualizationMethods não encontrado (Visualization pode não estar carregado).');
         }
 
-        // UI
+        // UI (fallback do Core)
         if (typeof Sftw1.injectUIMethods === 'function') {
             try {
-                Sftw1.injectUIMethods(this);
-                console.log('✅ UI injetado');
+                if (!this.ui || typeof this.setupGameUI !== 'function') {
+                    Sftw1.injectUIMethods(this);
+                    console.log('✅ UI injetado pelo Core (fallback)');
+                } else {
+                    console.log('ℹ️ UI já disponível; Core não reinjeta');
+                }
             } catch (e) {
                 console.warn('⚠️ Falha ao injetar UI:', e);
             }
@@ -289,33 +302,41 @@ class Sftw1 {
             console.warn('⚠️ injectUIMethods não encontrado (UI pode não estar carregado).');
         }
 
-        // Game
-        if (typeof Sftw1.injectGameMethods === 'function') {
-            try {
-                Sftw1.injectGameMethods(this);
-                console.log('✅ Game injetado');
-            } catch (e) {
-                console.warn('⚠️ Falha ao injetar Game:', e);
-            }
-        } else {
-            console.warn('⚠️ injectGameMethods não encontrado (Game pode não estar carregado).');
-        }
+        // Jogos
+        // Importante: a injeção de jogos fica a cargo do Loader.
+        // O Core NÃO reinjeta Game/Games aqui, para evitar sobrescrever
+        // startGame/endGame/callbacks e causar inconsistência no fluxo.
+        console.log('ℹ️ Injeção de jogos delegada ao Loader (Core não reinjeta jogos).');
 
-        // StarCatalog
+        // MessierGame
+        // Importante: a composição principal também fica a cargo do Loader.
+        // O Core não reinjeta o controller do Messier aqui para evitar disputa
+        // com a API pública final já estabilizada no runtime.
+        console.log('ℹ️ Injeção de MessierGame delegada ao Loader (Core não reinjeta controller).');
+
+        // StarCatalog (fallback do Core)
         if (typeof Sftw1.injectStarCatalogMethods === 'function') {
             try {
-                Sftw1.injectStarCatalogMethods(this);
-                console.log('✅ StarCatalog injetado');
+                if (!this.starCatalog) {
+                    Sftw1.injectStarCatalogMethods(this);
+                    console.log('✅ StarCatalog injetado pelo Core (fallback)');
+                } else {
+                    console.log('ℹ️ StarCatalog já disponível; Core não reinjeta');
+                }
             } catch (e) {
                 console.warn('⚠️ Falha ao injetar StarCatalog:', e);
             }
         }
 
-        // MessierCatalog
+        // MessierCatalog (fallback do Core)
         if (typeof Sftw1.injectMessierCatalogMethods === 'function') {
             try {
-                Sftw1.injectMessierCatalogMethods(this);
-                console.log('✅ MessierCatalog injetado');
+                if (!this.messier) {
+                    Sftw1.injectMessierCatalogMethods(this);
+                    console.log('✅ MessierCatalog injetado pelo Core (fallback)');
+                } else {
+                    console.log('ℹ️ MessierCatalog já disponível; Core não reinjeta');
+                }
             } catch (e) {
                 console.warn('⚠️ Falha ao injetar MessierCatalog:', e);
             }

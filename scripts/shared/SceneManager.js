@@ -38,6 +38,11 @@ class SceneManager {
             maxFOV: 120,
             defaultFOV: 60
         };
+
+        // Handlers persistentes para evitar leaks e permitir cleanup correto
+        this._planetariumHandlersAttached = false;
+        this._boundWindowResize = this.onWindowResize.bind(this);
+        this._boundViewportResize = this.onWindowResize.bind(this);
     }
 
     async init() {
@@ -99,103 +104,257 @@ class SceneManager {
     // Configurar controles ESPECIAIS para planetário
     setupPlanetariumControls() {
         if (!this.renderer || !this.camera) return;
-        
+
         const canvas = this.renderer.domElement;
-        
+
+        // Remover handlers antigos se o modo planetário for reconfigurado
+        if (this._planetariumHandlersAttached) {
+            this._detachPlanetariumHandlers();
+        }
+
         // Estado dos controles
         this.planetariumControls = {
             isDragging: false,
             lastMouse: { x: 0, y: 0 },
-            sensitivity: 0.003
+            sensitivity: 0.003,
+
+            // Touch/mobile
+            touchMode: 'idle', // idle | pendingTap | dragging | pinch
+            touchStart: { x: 0, y: 0 },
+            lastTouch: { x: 0, y: 0 },
+            touchStartTime: 0,
+            tapMaxMovementPx: 12,
+            tapMaxDurationMs: 260,
+            pinchStartDistance: 0,
+            pinchStartFov: this.camera.fov || this.planetariumSettings.defaultFOV
         };
-        
-        // 1. MOUSE DOWN - Começar arrastar
-        canvas.addEventListener('mousedown', (e) => {
+
+        const clampPitch = () => {
+            this.planetariumSettings.rotation.x = Math.max(
+                -Math.PI / 2.1,
+                Math.min(Math.PI / 2.1, this.planetariumSettings.rotation.x)
+            );
+        };
+
+        const rotateByDelta = (deltaX, deltaY, multiplier = 1) => {
+            if (!this.camera) return;
+            this.planetariumSettings.rotation.y += deltaX * this.planetariumControls.sensitivity * multiplier;
+            this.planetariumSettings.rotation.x += deltaY * this.planetariumControls.sensitivity * multiplier;
+            clampPitch();
+        };
+
+        const applyFov = (nextFov) => {
+            if (!this.camera) return;
+            this.camera.fov = Math.max(
+                this.planetariumSettings.minFOV,
+                Math.min(this.planetariumSettings.maxFOV, nextFov)
+            );
+            this.camera.updateProjectionMatrix();
+        };
+
+        const distanceBetweenTouches = (touchA, touchB) => {
+            const dx = touchA.clientX - touchB.clientX;
+            const dy = touchA.clientY - touchB.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        };
+
+        const dispatchSyntheticTapClick = (clientX, clientY) => {
+            try {
+                const clickEvt = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX,
+                    clientY,
+                    view: window
+                });
+                canvas.dispatchEvent(clickEvt);
+            } catch (error) {
+                console.warn('SceneManager: falha ao disparar click sintético de touch:', error);
+            }
+        };
+
+        // =========================
+        // MOUSE
+        // =========================
+        this._onPlanetariumMouseDown = (e) => {
             this.planetariumControls.isDragging = true;
             this.planetariumControls.lastMouse.x = e.clientX;
             this.planetariumControls.lastMouse.y = e.clientY;
             canvas.style.cursor = 'grabbing';
-        });
-        
-        // 2. MOUSE UP - Parar arrastar
-        canvas.addEventListener('mouseup', () => {
+        };
+
+        this._onPlanetariumMouseUp = () => {
             this.planetariumControls.isDragging = false;
             canvas.style.cursor = 'grab';
-        });
-        
-        // 3. MOUSE MOVE - Rotacionar vista (CÂMERA FIXA NO CENTRO)
-        canvas.addEventListener('mousemove', (e) => {
+        };
+
+        this._onPlanetariumMouseLeave = () => {
+            this.planetariumControls.isDragging = false;
+            canvas.style.cursor = 'grab';
+        };
+
+        this._onPlanetariumMouseMove = (e) => {
             if (!this.planetariumControls.isDragging || !this.camera) return;
-            
+
             const deltaX = e.clientX - this.planetariumControls.lastMouse.x;
             const deltaY = e.clientY - this.planetariumControls.lastMouse.y;
-            
-            // Atualizar rotação da câmera (ela está fixa no centro)
-            this.planetariumSettings.rotation.y += deltaX * this.planetariumControls.sensitivity;
-            this.planetariumSettings.rotation.x += deltaY * this.planetariumControls.sensitivity;
-            
-            // Limitar rotação vertical (não virar de cabeça para baixo)
-            this.planetariumSettings.rotation.x = Math.max(
-                -Math.PI / 2.1, 
-                Math.min(Math.PI / 2.1, this.planetariumSettings.rotation.x)
-            );
-            
+
+            rotateByDelta(deltaX, deltaY, 1);
+
             this.planetariumControls.lastMouse.x = e.clientX;
             this.planetariumControls.lastMouse.y = e.clientY;
-        });
-        
-        // 4. MOUSE WHEEL - Zoom (muda FOV, não posição)
-        canvas.addEventListener('wheel', (e) => {
+        };
+
+        this._onPlanetariumWheel = (e) => {
             e.preventDefault();
-            if (this.camera) {
-                const newFOV = this.camera.fov + e.deltaY * 0.05;
-                this.camera.fov = Math.max(
-                    this.planetariumSettings.minFOV, 
-                    Math.min(this.planetariumSettings.maxFOV, newFOV)
-                );
-                this.camera.updateProjectionMatrix();
-            }
-        });
-        
-        // 5. TOUCH para dispositivos móveis
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
+            applyFov(this.camera.fov + e.deltaY * 0.05);
+        };
+
+        canvas.addEventListener('mousedown', this._onPlanetariumMouseDown);
+        canvas.addEventListener('mouseup', this._onPlanetariumMouseUp);
+        canvas.addEventListener('mouseleave', this._onPlanetariumMouseLeave);
+        canvas.addEventListener('mousemove', this._onPlanetariumMouseMove);
+        canvas.addEventListener('wheel', this._onPlanetariumWheel, { passive: false });
+
+        // =========================
+        // TOUCH
+        // =========================
+        this._onPlanetariumTouchStart = (e) => {
+            if (!this.camera) return;
+
             if (e.touches.length === 1) {
-                this.planetariumControls.isDragging = true;
-                this.planetariumControls.lastMouse.x = e.touches[0].clientX;
-                this.planetariumControls.lastMouse.y = e.touches[0].clientY;
+                const t = e.touches[0];
+                this.planetariumControls.touchMode = 'pendingTap';
+                this.planetariumControls.isDragging = false;
+                this.planetariumControls.touchStart.x = t.clientX;
+                this.planetariumControls.touchStart.y = t.clientY;
+                this.planetariumControls.lastTouch.x = t.clientX;
+                this.planetariumControls.lastTouch.y = t.clientY;
+                this.planetariumControls.touchStartTime = performance.now();
+                canvas.style.cursor = 'grab';
+                e.preventDefault();
+            } else if (e.touches.length === 2) {
+                this.planetariumControls.touchMode = 'pinch';
+                this.planetariumControls.isDragging = false;
+                this.planetariumControls.pinchStartDistance = distanceBetweenTouches(e.touches[0], e.touches[1]);
+                this.planetariumControls.pinchStartFov = this.camera.fov;
+                e.preventDefault();
             }
-        });
-        
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (this.planetariumControls.isDragging && e.touches.length === 1 && this.camera) {
-                const deltaX = e.touches[0].clientX - this.planetariumControls.lastMouse.x;
-                const deltaY = e.touches[0].clientY - this.planetariumControls.lastMouse.y;
-                
-                this.planetariumSettings.rotation.y += deltaX * this.planetariumControls.sensitivity * 2;
-                this.planetariumSettings.rotation.x += deltaY * this.planetariumControls.sensitivity * 2;
-                
-                this.planetariumSettings.rotation.x = Math.max(
-                    -Math.PI / 2.1, 
-                    Math.min(Math.PI / 2.1, this.planetariumSettings.rotation.x)
-                );
-                
-                this.planetariumControls.lastMouse.x = e.touches[0].clientX;
-                this.planetariumControls.lastMouse.y = e.touches[0].clientY;
+        };
+
+        this._onPlanetariumTouchMove = (e) => {
+            if (!this.camera) return;
+
+            if (e.touches.length === 1) {
+                const t = e.touches[0];
+                const moveFromStartX = t.clientX - this.planetariumControls.touchStart.x;
+                const moveFromStartY = t.clientY - this.planetariumControls.touchStart.y;
+                const moveFromStart = Math.sqrt(moveFromStartX * moveFromStartX + moveFromStartY * moveFromStartY);
+
+                if (this.planetariumControls.touchMode === 'pendingTap' &&
+                    moveFromStart > this.planetariumControls.tapMaxMovementPx) {
+                    this.planetariumControls.touchMode = 'dragging';
+                    this.planetariumControls.isDragging = true;
+                    canvas.style.cursor = 'grabbing';
+                }
+
+                if (this.planetariumControls.touchMode === 'dragging') {
+                    const deltaX = t.clientX - this.planetariumControls.lastTouch.x;
+                    const deltaY = t.clientY - this.planetariumControls.lastTouch.y;
+                    rotateByDelta(deltaX, deltaY, 2);
+                }
+
+                this.planetariumControls.lastTouch.x = t.clientX;
+                this.planetariumControls.lastTouch.y = t.clientY;
+                e.preventDefault();
+            } else if (e.touches.length === 2) {
+                if (this.planetariumControls.touchMode !== 'pinch') {
+                    this.planetariumControls.touchMode = 'pinch';
+                    this.planetariumControls.pinchStartDistance = distanceBetweenTouches(e.touches[0], e.touches[1]);
+                    this.planetariumControls.pinchStartFov = this.camera.fov;
+                }
+
+                const currentDistance = distanceBetweenTouches(e.touches[0], e.touches[1]);
+                if (this.planetariumControls.pinchStartDistance > 0 && currentDistance > 0) {
+                    const scale = this.planetariumControls.pinchStartDistance / currentDistance;
+                    applyFov(this.planetariumControls.pinchStartFov * scale);
+                }
+                e.preventDefault();
             }
-        });
-        
-        canvas.addEventListener('touchend', () => {
+        };
+
+        this._onPlanetariumTouchEnd = (e) => {
+            const remainingTouches = e.touches ? e.touches.length : 0;
+
+            if (remainingTouches === 0) {
+                const wasPendingTap = this.planetariumControls.touchMode === 'pendingTap';
+                const elapsed = performance.now() - this.planetariumControls.touchStartTime;
+                const endTouch = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
+
+                if (wasPendingTap && endTouch) {
+                    const dx = endTouch.clientX - this.planetariumControls.touchStart.x;
+                    const dy = endTouch.clientY - this.planetariumControls.touchStart.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist <= this.planetariumControls.tapMaxMovementPx &&
+                        elapsed <= this.planetariumControls.tapMaxDurationMs) {
+                        dispatchSyntheticTapClick(endTouch.clientX, endTouch.clientY);
+                    }
+                }
+
+                this.planetariumControls.touchMode = 'idle';
+                this.planetariumControls.isDragging = false;
+                canvas.style.cursor = 'grab';
+            } else if (remainingTouches === 1) {
+                const t = e.touches[0];
+                this.planetariumControls.touchMode = 'pendingTap';
+                this.planetariumControls.touchStart.x = t.clientX;
+                this.planetariumControls.touchStart.y = t.clientY;
+                this.planetariumControls.lastTouch.x = t.clientX;
+                this.planetariumControls.lastTouch.y = t.clientY;
+                this.planetariumControls.touchStartTime = performance.now();
+                this.planetariumControls.isDragging = false;
+            }
+        };
+
+        this._onPlanetariumTouchCancel = () => {
+            this.planetariumControls.touchMode = 'idle';
             this.planetariumControls.isDragging = false;
-        });
-        
-        // 6. Cursor inicial
+            canvas.style.cursor = 'grab';
+        };
+
+        canvas.addEventListener('touchstart', this._onPlanetariumTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', this._onPlanetariumTouchMove, { passive: false });
+        canvas.addEventListener('touchend', this._onPlanetariumTouchEnd, { passive: false });
+        canvas.addEventListener('touchcancel', this._onPlanetariumTouchCancel, { passive: false });
+
+        // Estado inicial
         canvas.style.cursor = 'grab';
-        
-        console.log('Controles Planetários configurados: Arraste para girar, Scroll para zoom');
+        canvas.style.touchAction = 'none';
+        this._planetariumHandlersAttached = true;
+
+        console.log('Controles Planetários configurados: arraste para girar, scroll/pinça para zoom, toque curto para clique');
     }
-    
+
+    _detachPlanetariumHandlers() {
+        if (!this.renderer || !this._planetariumHandlersAttached) return;
+
+        const canvas = this.renderer.domElement;
+
+        canvas.removeEventListener('mousedown', this._onPlanetariumMouseDown);
+        canvas.removeEventListener('mouseup', this._onPlanetariumMouseUp);
+        canvas.removeEventListener('mouseleave', this._onPlanetariumMouseLeave);
+        canvas.removeEventListener('mousemove', this._onPlanetariumMouseMove);
+        canvas.removeEventListener('wheel', this._onPlanetariumWheel);
+
+        canvas.removeEventListener('touchstart', this._onPlanetariumTouchStart);
+        canvas.removeEventListener('touchmove', this._onPlanetariumTouchMove);
+        canvas.removeEventListener('touchend', this._onPlanetariumTouchEnd);
+        canvas.removeEventListener('touchcancel', this._onPlanetariumTouchCancel);
+
+        this._planetariumHandlersAttached = false;
+    }
+
     // Atualizar rotação da câmera no planetário (chamar no loop de animação)
     updatePlanetariumCamera() {
         if (!this.isPlanetariumMode || !this.camera) return;
@@ -293,7 +452,7 @@ class SceneManager {
             alpha: true
         });
         this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         this.renderer.shadowMap.enabled = true;
     }
 
@@ -329,7 +488,12 @@ class SceneManager {
     }
 
     setupEventListeners() {
-        window.addEventListener('resize', () => this.onWindowResize());
+        window.addEventListener('resize', this._boundWindowResize);
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', this._boundViewportResize);
+            window.visualViewport.addEventListener('scroll', this._boundViewportResize);
+        }
     }
 
     onWindowResize() {
@@ -744,7 +908,12 @@ class SceneManager {
         }
         
         // Remover event listeners globais
-        window.removeEventListener('resize', () => this.onWindowResize());
+        window.removeEventListener('resize', this._boundWindowResize);
+
+        if (window.visualViewport) {
+            window.visualViewport.removeEventListener('resize', this._boundViewportResize);
+            window.visualViewport.removeEventListener('scroll', this._boundViewportResize);
+        }
         
         // Limpar referências
         this.scene = null;
