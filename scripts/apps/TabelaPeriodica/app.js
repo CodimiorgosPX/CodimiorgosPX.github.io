@@ -2,15 +2,19 @@ const tableGrid = document.getElementById("table-grid");
 const startBtn = document.getElementById("start-btn");
 const statusEl = document.getElementById("status");
 const selectedSlotEl = document.getElementById("selected-slot");
+const mobileSelectedSlotEl = document.getElementById("mobile-selected-slot");
 const answerInput = document.getElementById("answer-input");
 const feedbackEl = document.getElementById("feedback");
 const progressFillEl = document.getElementById("progress-fill");
 const progressCountEl = document.getElementById("progress-count");
 const progressPercentEl = document.getElementById("progress-percent");
 const revealBtn = document.getElementById("reveal-btn");
+const boardWrap = document.getElementById("board-wrap");
+const mobileOpenInputBtn = document.getElementById("mobile-open-input-btn");
 
 let elements = [];
 let selectedElement = null;
+let selectedCellEl = null;
 let revealed = new Set();
 let started = false;
 
@@ -20,6 +24,11 @@ let discoveryOrder = [];
 let errorByElement = new Map();
 
 const HINT_UNLOCK_ERRORS = 3;
+const MOBILE_BREAKPOINT = 768;
+
+function isMobileLayout() {
+  return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
+}
 
 async function loadData() {
   const response = await fetch("./data/periodic_table_pt.json");
@@ -119,8 +128,115 @@ function createSeriesLabelCell(kind) {
   return cell;
 }
 
+function clearSelectedCellVisual() {
+  if (selectedCellEl) {
+    selectedCellEl.classList.remove("selected-mobile");
+  }
+  selectedCellEl = null;
+}
+
+function syncSelectedLabels() {
+  const text = selectedElement
+    ? getSelectedText(selectedElement)
+    : "Nenhum espaço selecionado.";
+
+  if (selectedSlotEl) {
+    selectedSlotEl.textContent = text;
+  }
+
+  if (mobileSelectedSlotEl) {
+    mobileSelectedSlotEl.textContent = text;
+  }
+}
+
+function setFeedback(message, type = "neutral") {
+  if (!feedbackEl) return;
+
+  feedbackEl.textContent = message;
+  feedbackEl.className =
+    type === "success"
+      ? "feedback-success"
+      : type === "error"
+      ? "feedback-error"
+      : "feedback-neutral";
+}
+
+function updateKeyboardState() {
+  if (!window.visualViewport) return;
+
+  const keyboardOpen = window.visualViewport.height < window.innerHeight * 0.78;
+  document.body.classList.toggle("keyboard-open", keyboardOpen);
+}
+
+function setupViewportHandling() {
+  if (!window.visualViewport) return;
+
+  window.visualViewport.addEventListener("resize", updateKeyboardState);
+  window.visualViewport.addEventListener("scroll", updateKeyboardState);
+  updateKeyboardState();
+}
+
+function scrollCellIntoView(cell) {
+  if (!cell) return;
+
+  try {
+    cell.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "center"
+    });
+  } catch {
+    cell.scrollIntoView();
+  }
+}
+
+function openMobileInput() {
+  if (!isMobileLayout()) {
+    answerInput?.focus();
+    return;
+  }
+
+  if (!selectedElement) {
+    setFeedback("Selecione um bloco antes de digitar.", "neutral");
+    return;
+  }
+
+  if (!answerInput) return;
+
+  window.requestAnimationFrame(() => {
+    answerInput.focus({ preventScroll: true });
+    setTimeout(() => {
+      answerInput.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+  });
+}
+
+function handleCellSelection(element, cell) {
+  if (!started) return;
+
+  selectedElement = element;
+  clearSelectedCellVisual();
+  selectedCellEl = cell;
+
+  if (isMobileLayout() && selectedCellEl) {
+    selectedCellEl.classList.add("selected-mobile");
+  }
+
+  syncSelectedLabels();
+  setFeedback("Bloco selecionado. Digite o símbolo ou nome do elemento.", "neutral");
+  updateRevealButtonState();
+  scrollCellIntoView(cell);
+
+  if (!isMobileLayout()) {
+    answerInput?.focus({ preventScroll: true });
+  } else {
+    answerInput?.blur();
+  }
+}
+
 function renderTable() {
   tableGrid.innerHTML = "";
+  clearSelectedCellVisual();
 
   for (let y = 1; y <= 9; y++) {
     for (let x = 1; x <= 18; x++) {
@@ -153,15 +269,13 @@ function renderTable() {
         cell.textContent = "?";
         cell.title = getSlotTitle(element);
 
-        cell.addEventListener("click", () => {
-          if (!started) return;
+        if (selectedElement && selectedElement.number === element.number && isMobileLayout()) {
+          cell.classList.add("selected-mobile");
+          selectedCellEl = cell;
+        }
 
-          selectedElement = element;
-          selectedSlotEl.textContent = getSelectedText(element);
-          feedbackEl.textContent = "";
-          feedbackEl.className = "feedback-neutral";
-          answerInput.focus();
-          updateRevealButtonState();
+        cell.addEventListener("click", () => {
+          handleCellSelection(element, cell);
         });
       }
 
@@ -186,14 +300,21 @@ function getSelectedText(element) {
   const localErrors = getErrorsForElement(element);
 
   if (element.y === 8) {
-    return `Espaço selecionado: série dos lantanídeos • número atômico ${element.number} • erros neste bloco: ${localErrors}`;
+    return `Lantanídeos • Z=${element.number} • erros neste bloco: ${localErrors}`;
   }
 
   if (element.y === 9) {
-    return `Espaço selecionado: série dos actinídeos • número atômico ${element.number} • erros neste bloco: ${localErrors}`;
+    return `Actinídeos • Z=${element.number} • erros neste bloco: ${localErrors}`;
   }
 
-  return `Espaço selecionado: período ${element.period}, grupo ${element.group} • número atômico ${element.number} • erros neste bloco: ${localErrors}`;
+  return `Período ${element.period}, grupo ${element.group} • Z=${element.number} • erros neste bloco: ${localErrors}`;
+}
+
+function resetSelection() {
+  selectedElement = null;
+  clearSelectedCellVisual();
+  syncSelectedLabels();
+  updateRevealButtonState();
 }
 
 function startGame() {
@@ -201,10 +322,8 @@ function startGame() {
 
   started = true;
   revealed.clear();
-  selectedElement = null;
+  resetSelection();
   answerInput.value = "";
-  feedbackEl.textContent = "";
-  feedbackEl.className = "feedback-neutral";
 
   errorCount = 0;
   hintCount = 0;
@@ -214,9 +333,7 @@ function startGame() {
   const first = elements[Math.floor(Math.random() * elements.length)];
   revealElement(first, "inicial");
 
-  selectedSlotEl.textContent = "Nenhum espaço selecionado.";
-  feedbackEl.textContent = `Jogo iniciado. Elemento inicial: ${first.name} (${first.symbol}).`;
-  feedbackEl.className = "feedback-success";
+  setFeedback(`Jogo iniciado. Elemento inicial: ${first.name} (${first.symbol}).`, "success");
   statusEl.textContent = `Jogo iniciado. Elemento inicial: ${first.name} (${first.symbol})`;
 
   renderTable();
@@ -224,6 +341,11 @@ function startGame() {
   updateStats();
   renderDiscoveryOrder();
   updateRevealButtonState();
+
+  if (boardWrap) {
+    boardWrap.scrollTop = 0;
+    boardWrap.scrollLeft = 0;
+  }
 }
 
 function revealElement(element, source = "acerto") {
@@ -248,8 +370,7 @@ function submitAnswer() {
   const acceptedSymbol = normalize(selectedElement.symbol);
 
   if (!typed) {
-    feedbackEl.textContent = "Digite algo antes de confirmar.";
-    feedbackEl.className = "feedback-neutral";
+    setFeedback("Digite algo antes de confirmar.", "neutral");
     return;
   }
 
@@ -258,17 +379,14 @@ function submitAnswer() {
 
     revealElement(justSolved, "acerto");
 
-    feedbackEl.textContent = `Correto: ${justSolved.name} (${justSolved.symbol})`;
-    feedbackEl.className = "feedback-success";
-    selectedElement = null;
-    selectedSlotEl.textContent = "Nenhum espaço selecionado.";
+    setFeedback(`Correto: ${justSolved.name} (${justSolved.symbol})`, "success");
     answerInput.value = "";
+    resetSelection();
 
     renderTable();
     updateProgressStatus();
     updateStats();
     renderDiscoveryOrder();
-    updateRevealButtonState();
     return;
   }
 
@@ -278,14 +396,18 @@ function submitAnswer() {
   const localErrors = getErrorsForElement(selectedElement);
 
   if (localErrors >= HINT_UNLOCK_ERRORS) {
-    feedbackEl.textContent = `Resposta incorreta. O gabarito deste bloco foi liberado (${localErrors}/${HINT_UNLOCK_ERRORS}).`;
+    setFeedback(
+      `Resposta incorreta. O gabarito deste bloco foi liberado (${localErrors}/${HINT_UNLOCK_ERRORS}).`,
+      "error"
+    );
   } else {
-    feedbackEl.textContent = `Resposta incorreta. Erros neste bloco: ${localErrors}/${HINT_UNLOCK_ERRORS}.`;
+    setFeedback(
+      `Resposta incorreta. Erros neste bloco: ${localErrors}/${HINT_UNLOCK_ERRORS}.`,
+      "error"
+    );
   }
 
-  feedbackEl.className = "feedback-error";
-  selectedSlotEl.textContent = getSelectedText(selectedElement);
-
+  syncSelectedLabels();
   updateStats();
   updateRevealButtonState();
 }
@@ -294,15 +416,16 @@ function revealSelectedElement() {
   if (!started) return;
 
   if (!selectedElement) {
-    feedbackEl.textContent = "Selecione um bloco antes de usar o gabarito.";
-    feedbackEl.className = "feedback-neutral";
+    setFeedback("Selecione um bloco antes de usar o gabarito.", "neutral");
     return;
   }
 
   if (!canRevealSelectedElement()) {
     const localErrors = getErrorsForElement(selectedElement);
-    feedbackEl.textContent = `O gabarito ainda não está liberado para este bloco (${localErrors}/${HINT_UNLOCK_ERRORS}).`;
-    feedbackEl.className = "feedback-neutral";
+    setFeedback(
+      `O gabarito ainda não está liberado para este bloco (${localErrors}/${HINT_UNLOCK_ERRORS}).`,
+      "neutral"
+    );
     updateRevealButtonState();
     return;
   }
@@ -312,17 +435,14 @@ function revealSelectedElement() {
   const hinted = selectedElement;
   revealElement(hinted, "dica");
 
-  feedbackEl.textContent = `Dica usada: este bloco é ${hinted.name} (${hinted.symbol}).`;
-  feedbackEl.className = "feedback-success";
-  selectedElement = null;
-  selectedSlotEl.textContent = "Nenhum espaço selecionado.";
+  setFeedback(`Dica usada: este bloco é ${hinted.name} (${hinted.symbol}).`, "success");
   answerInput.value = "";
+  resetSelection();
 
   renderTable();
   updateProgressStatus();
   updateStats();
   renderDiscoveryOrder();
-  updateRevealButtonState();
 }
 
 function updateProgressStatus() {
@@ -388,10 +508,34 @@ function renderDiscoveryOrder() {
   });
 }
 
+function handleResize() {
+  updateKeyboardState();
+
+  if (!isMobileLayout()) {
+    clearSelectedCellVisual();
+    if (selectedElement && answerInput) {
+      answerInput.blur();
+    }
+  } else if (selectedElement && selectedCellEl) {
+    selectedCellEl.classList.add("selected-mobile");
+  }
+
+  syncSelectedLabels();
+}
+
 answerInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
+    event.preventDefault();
     submitAnswer();
   }
+});
+
+answerInput.addEventListener("focus", () => {
+  document.body.classList.add("keyboard-open");
+});
+
+answerInput.addEventListener("blur", () => {
+  setTimeout(() => updateKeyboardState(), 120);
 });
 
 startBtn.addEventListener("click", startGame);
@@ -400,21 +544,28 @@ if (revealBtn) {
   revealBtn.addEventListener("click", revealSelectedElement);
 }
 
+if (mobileOpenInputBtn) {
+  mobileOpenInputBtn.addEventListener("click", openMobileInput);
+}
+
+window.addEventListener("resize", handleResize);
+
 async function init() {
   try {
     ensureDynamicStyles();
+    setupViewportHandling();
     await loadData();
     renderTable();
     updateProgressStatus();
     updateStats();
     renderDiscoveryOrder();
+    syncSelectedLabels();
     updateRevealButtonState();
     statusEl.textContent = `Dados carregados: ${elements.length} elementos`;
   } catch (error) {
     console.error(error);
     statusEl.textContent = "Erro ao carregar os dados.";
-    feedbackEl.textContent = error.message;
-    feedbackEl.className = "feedback-error";
+    setFeedback(error.message, "error");
   }
 }
 

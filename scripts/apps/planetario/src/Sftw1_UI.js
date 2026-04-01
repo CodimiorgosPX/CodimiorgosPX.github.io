@@ -336,6 +336,19 @@ class Sftw1_UI {
                                     <span>Mostrar nomes descobertos</span>
                                 </label>
                             </div>
+
+                            <div class="sftw-divider"></div>
+                            <div class="sftw-help">Jogo 1 — aparência durante a sessão</div>
+                            <div class="sftw-togglelist">
+                                <label class="sftw-toggle">
+                                    <input id="game1-show-boundaries" type="checkbox" checked>
+                                    <span>Mostrar limites revelados</span>
+                                </label>
+                                <label class="sftw-toggle">
+                                    <input id="game1-show-labels" type="checkbox">
+                                    <span>Mostrar nomes revelados</span>
+                                </label>
+                            </div>
                         </div>
 
                         <div class="sftw-card" id="sftw-progress-section">
@@ -765,6 +778,9 @@ class Sftw1_UI {
         this.elements.starFilterConstellation = document.getElementById('star-filter-constellation');
         this.elements.btnStarRefreshPool = document.getElementById('btn-star-refresh-pool');
 
+        this.elements.game1ShowBoundaries = document.getElementById('game1-show-boundaries');
+        this.elements.game1ShowLabels = document.getElementById('game1-show-labels');
+
         // Busca e navegação
         this.elements.searchInput = document.getElementById('constellation-search-input');
         this.elements.searchButton = document.getElementById('btn-search-constellation');
@@ -827,6 +843,13 @@ class Sftw1_UI {
         
         // Navegação
         this.setupNavigationEvents();
+
+        if (this.elements.game1ShowBoundaries) {
+            this.elements.game1ShowBoundaries.addEventListener('change', () => this.applyGameOptionsToVisualization());
+        }
+        if (this.elements.game1ShowLabels) {
+            this.elements.game1ShowLabels.addEventListener('change', () => this.applyGameOptionsToVisualization());
+        }
         
 
         // (Redesign) diagnósticos removidos do layout principal
@@ -1109,7 +1132,9 @@ class Sftw1_UI {
                 : payloadOrAbbr;
 
             if (abbr) {
-                this.showMessage(`Correto: ${abbr}`, 'success', 1400, {
+                const abbrLabel = String(abbr || '').trim();
+                const ptName = (typeof this.sftw?.getConstellationNamePt === 'function') ? this.sftw.getConstellationNamePt(abbrLabel) : abbrLabel;
+                this.showMessage(`Correto: ${ptName} (${abbrLabel})`, 'success', 1400, {
                     replaceKey: 'constellation-correct',
                     replaceActive: true,
                     skipQueue: true
@@ -1236,27 +1261,36 @@ class Sftw1_UI {
     startGame() {
         console.log('🎮 UI: Iniciar jogo solicitado');
 
+        this.clearAllMessages({ clearQueue: true, keepActive: false });
         this.applyGameOptionsToVisualization();
+        const startOptions = this.getConstellationGameStartOptions();
 
         this.openConstellationSelectionModal({
             title: 'Escolha a constelação inicial',
             onSelect: (abbr) => {
                 if (typeof this.sftw.startGame === 'function') {
-                    this.sftw.startGame(abbr);
+                    this.sftw.startGame(abbr, startOptions);
                     return;
                 }
 
                 const game = this.getPrimaryGameController();
                 if (game && typeof game.startGame === 'function') {
-                    game.startGame(abbr);
+                    game.startGame(abbr, startOptions);
                     return;
                 }
 
-                this.showMessage('Sistema de jogo não disponível (startGame)', 'error');
+                this.showMessage('Sistema de jogo não disponível (startGame)', 'error', 2200, { replaceKey: 'game1-error', replaceActive: true, skipQueue: true });
             }
         });
     }
     
+    getConstellationGameStartOptions() {
+        return {
+            showBoundaries: this.elements.game1ShowBoundaries ? !!this.elements.game1ShowBoundaries.checked : true,
+            showLabels: this.elements.game1ShowLabels ? !!this.elements.game1ShowLabels.checked : false
+        };
+    }
+
     selectConstellation() {
         console.log('🎯 UI: Selecionar constelação solicitado');
 
@@ -1297,6 +1331,7 @@ class Sftw1_UI {
     endGame() {
         console.log('🚪 UI: Sair do jogo solicitado');
 
+        this.clearAllMessages({ clearQueue: true, keepActive: false });
         this.resetProgressChecklist?.();
         this.setProgressPanelVisible?.(false);
 
@@ -1396,6 +1431,7 @@ class Sftw1_UI {
     }
 
     startNeighborTrainingFromUI() {
+        this.clearAllMessages({ clearQueue: true, keepActive: false });
         if (typeof this.sftw?.startNeighborGame !== 'function') {
             this.showMessage('Sistema do treino de limites não está disponível.', 'error');
             return;
@@ -1441,6 +1477,7 @@ class Sftw1_UI {
     }
 
     stopNeighborTrainingFromUI() {
+        this.clearAllMessages({ clearQueue: true, keepActive: false });
         if (typeof this.sftw?.endNeighborGame === 'function') {
             this.sftw.endNeighborGame();
         }
@@ -1917,6 +1954,7 @@ class Sftw1_UI {
     }
 
     startMessierGameFromUI() {
+        this.clearAllMessages({ clearQueue: true, keepActive: false });
         const opts = this._readMessierOptionsFromUI();
         if (typeof this.sftw.startMessierGame !== 'function') {
             this.showMessage('Sistema do jogo Messier não disponível.', 'error');
@@ -1933,6 +1971,7 @@ class Sftw1_UI {
     }
 
     stopMessierGameFromUI() {
+        this.clearAllMessages({ clearQueue: true, keepActive: false });
         if (typeof this.sftw.stopMessierGame !== 'function') {
             this.showMessage('Sistema do jogo Messier não disponível.', 'error');
             return;
@@ -3613,7 +3652,7 @@ const progressLabel = document.getElementById('game-progress-label');
             }
 
             if (!skipQueue) {
-                this.messageQueue.push({ message, type, duration, replaceKey: null });
+                this.messageQueue = [{ message, type, duration, replaceKey: null }];
             }
             return;
         }
@@ -3709,6 +3748,15 @@ const progressLabel = document.getElementById('game-progress-label');
                 this.displayMessage(next.message, next.type, next.duration, { replaceKey: next.replaceKey || null });
             }
         }, 300);
+    }
+
+    clearAllMessages(options = {}) {
+        const clearQueue = options.clearQueue !== false;
+        const keepActive = !!options.keepActive;
+        if (clearQueue) this.messageQueue = [];
+        if (!keepActive && this.activeMessage) {
+            this.removeMessage(this.activeMessage, { immediate: true, suppressQueue: true });
+        }
     }
 
     getMessageIcon(type) {
@@ -4388,7 +4436,9 @@ addMessageStyles() {
         return {
             showProgress: this.elements.optShowProgress ? !!this.elements.optShowProgress.checked : true,
             showDiscoveredNames: this.elements.optShowDiscoveredNames ? !!this.elements.optShowDiscoveredNames.checked : true,
-            showDiscoveredFill: this.elements.optShowDiscoveredFill ? !!this.elements.optShowDiscoveredFill.checked : true
+            showDiscoveredFill: this.elements.optShowDiscoveredFill ? !!this.elements.optShowDiscoveredFill.checked : true,
+            game1ShowBoundaries: this.elements.game1ShowBoundaries ? !!this.elements.game1ShowBoundaries.checked : true,
+            game1ShowLabels: this.elements.game1ShowLabels ? !!this.elements.game1ShowLabels.checked : false
         };
     }
 

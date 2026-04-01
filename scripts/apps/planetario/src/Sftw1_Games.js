@@ -25,7 +25,11 @@ class Sftw1_ConstellationGame {
             allowedTargets: new Set(),
             useAdjacency: false,
             attempts: {},
-            finished: false
+            finished: false,
+            visualOptions: {
+                showBoundaries: true,
+                showLabels: false
+            }
         };
 
         console.log('🎮 Sftw1_ConstellationGame inicializado');
@@ -53,6 +57,8 @@ class Sftw1_ConstellationGame {
             if (c?.fullName) names.add(this.normalizeInput(c.fullName));
             if (c?.latinName) names.add(this.normalizeInput(c.latinName));
             if (c?.portugueseName) names.add(this.normalizeInput(c.portugueseName));
+            const ptFallback = this._getPortugueseFallback(c?.abbreviation);
+            if (ptFallback) names.add(this.normalizeInput(ptFallback));
             if (Array.isArray(c?.aliases)) c.aliases.forEach((a) => names.add(this.normalizeInput(a)));
             return names.has(normalized);
         });
@@ -63,6 +69,14 @@ class Sftw1_ConstellationGame {
     _getConstellationData(abbr) {
         const key = this._resolveConstellationAbbr(abbr);
         return (this.sftw.constellations || []).find((c) => c.abbreviation === key) || null;
+    }
+
+    _getPortugueseFallback(abbr) {
+        if (!abbr) return '';
+        if (typeof this.sftw?.getConstellationNamePt === 'function') {
+            return this.sftw.getConstellationNamePt(abbr) || '';
+        }
+        return '';
     }
 
 
@@ -79,7 +93,7 @@ class Sftw1_ConstellationGame {
         console.log('🎯 Games/Constellation: aguardando seleção de constelação inicial');
     }
 
-    startGame(constellationAbbr) {
+    startGame(constellationAbbr, options = {}) {
         const startAbbr = this._resolveConstellationAbbr(constellationAbbr);
         if (!startAbbr) {
             console.error('❌ startGame: constelação inválida');
@@ -98,12 +112,16 @@ class Sftw1_ConstellationGame {
         this.state.startConstellation = startAbbr;
         this.state.currentConstellation = startAbbr;
         this.state.score = 0;
+        this.state.visualOptions = {
+            showBoundaries: options?.showBoundaries !== undefined ? !!options.showBoundaries : true,
+            showLabels: options?.showLabels !== undefined ? !!options.showLabels : false
+        };
 
         this.sftw.callbacks = this.sftw.callbacks || {};
         this.sftw.callbacks.onConstellationClick = (abbr) => this.handleConstellationClick(abbr);
 
         if (typeof this.sftw.startGameMode === 'function') {
-            this.sftw.startGameMode(startAbbr);
+            this.sftw.startGameMode(startAbbr, this.state.visualOptions);
         }
 
         // Descobrir constelação inicial
@@ -201,16 +219,16 @@ class Sftw1_ConstellationGame {
         if (typeof this.sftw.revealConstellation === 'function') {
             this.sftw.revealConstellation(key, {
                 fog: true,
-                showBoundaries: true,
+                showBoundaries: !!this.state.visualOptions?.showBoundaries,
                 showStars: true,
-                showLabel: true
+                showLabel: !!this.state.visualOptions?.showLabels
             });
         } else if (this.sftw.visualization && typeof this.sftw.visualization.revealConstellation === 'function') {
             this.sftw.visualization.revealConstellation(key, {
                 fog: true,
-                showBoundaries: true,
+                showBoundaries: !!this.state.visualOptions?.showBoundaries,
                 showStars: true,
-                showLabel: true
+                showLabel: !!this.state.visualOptions?.showLabels
             });
         }
 
@@ -380,6 +398,8 @@ class Sftw1_ConstellationGame {
         if (c.fullName) names.add(this.normalizeInput(c.fullName));
         if (c.latinName) names.add(this.normalizeInput(c.latinName));
         if (c.portugueseName) names.add(this.normalizeInput(c.portugueseName));
+        const ptFallback = this._getPortugueseFallback(c.abbreviation);
+        if (ptFallback) names.add(this.normalizeInput(ptFallback));
 
         if (c.aliases && Array.isArray(c.aliases)) {
             c.aliases.forEach((a) => names.add(this.normalizeInput(a)));
@@ -878,7 +898,7 @@ if (typeof window !== 'undefined') {
             sftwInstance.game = games.constellation;
             sftwInstance.setupGameControls = () => games.constellation.setupControls();
             sftwInstance.showConstellationSelection = () => games.constellation.showSelection();
-            sftwInstance.startGame = (abbr) => games.constellation.startGame(abbr);
+            sftwInstance.startGame = (abbr, options = {}) => games.constellation.startGame(abbr, options);
             sftwInstance.restartGame = () => games.constellation.restartGame();
             sftwInstance.returnToMainMenu = () => games.constellation.returnToMainMenu();
             sftwInstance.endGame = () => games.constellation.endGame();
@@ -890,7 +910,7 @@ if (typeof window !== 'undefined') {
             sftwInstance.registerConstellationAttempt = (...args) => games.constellation.registerAttempt(...args);
 
             // Alias mais explícitos
-            sftwInstance.startConstellationGame = (abbr) => games.constellation.startGame(abbr);
+            sftwInstance.startConstellationGame = (abbr, options = {}) => games.constellation.startGame(abbr, options);
             sftwInstance.endConstellationGame = () => games.constellation.endGame();
             sftwInstance.cancelConstellationGame = () => games.constellation.cancelGame();
             sftwInstance.getConstellationGameState = () => games.constellation.getGameState();
@@ -906,22 +926,11 @@ if (typeof window !== 'undefined') {
                 sftwInstance.restartNeighborGame = (options = {}) => games.neighbor.restartGame(options);
                 sftwInstance.getNeighborGameState = () => games.neighbor.getGameState();
                 sftwInstance.getNeighborGameReport = () => games.neighbor.getFinalReport();
-                sftwInstance.getNeighborLastRoundResult = () =>
-                    (typeof games.neighbor.getLastRoundResult === 'function' ? games.neighbor.getLastRoundResult() : null);
-
-                // Alias explícitos para a UI do Treino 2
-                sftwInstance.startConstellationNeighborTraining = (options = {}) => games.neighbor.startGame(options);
-                sftwInstance.submitConstellationNeighborTraining = (inputText) => games.neighbor.submitAnswer(inputText);
-                sftwInstance.endConstellationNeighborTraining = () => games.neighbor.endGame();
-                sftwInstance.cancelConstellationNeighborTraining = () => games.neighbor.cancelGame();
-                sftwInstance.restartConstellationNeighborTraining = (options = {}) => games.neighbor.restartGame(options);
-                sftwInstance.getConstellationNeighborTrainingState = () => games.neighbor.getGameState();
-                sftwInstance.getConstellationNeighborTrainingReport = () => games.neighbor.getFinalReport();
             }
 
             console.log('✅ Sftw1_Games injetado no Core');
         };
     }
 
-    console.log('✅ Sftw1_Games.js carregado (v4.3)');
+    console.log('✅ Sftw1_Games.js carregado (v4.2)');
 }

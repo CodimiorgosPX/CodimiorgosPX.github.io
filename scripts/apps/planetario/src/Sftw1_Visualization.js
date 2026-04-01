@@ -63,7 +63,9 @@ class Sftw1_Visualization {
         this.gameOptions = {
             showDiscoveredFill: true,   // fundo azul escuro nas descobertas
             showDiscoveredNames: true,  // mostrar nomes das descobertas no modo jogo
-            showProgress: true          // UI (guardado aqui para consistência)
+            showProgress: true,         // UI (guardado aqui para consistência)
+            game1ShowBoundaries: true,
+            game1ShowLabels: false
         };
 
         // Preenchimento (fundo azul) por constelação, gerado a partir dos polígonos dos boundaries
@@ -1568,7 +1570,7 @@ this.buildConstellationClickPolygons();
         canvas.addEventListener('mousemove', this.boundMouseMove);
         canvas.addEventListener('click', this.boundMouseClick);
         
-        canvas.style.cursor = 'pointer';
+        canvas.style.cursor = 'default';
         
         console.log('✅ Interação configurada');
     }
@@ -1587,7 +1589,11 @@ this.buildConstellationClickPolygons();
         // 1) Messier
         // 2) estrelas
         // 3) constelações
-        if (!this.gameMode) {
+        const messierActive = (typeof this.sftw?.isMessierGameActive === 'function')
+            ? !!this.sftw.isMessierGameActive()
+            : !!this.messierGame?.active;
+
+        if (!this.gameMode && !messierActive) {
             const mh = this._pickMessierUnderPointer?.(event);
             if (mh && mh.id) {
                 this._lastHoverMessierId = mh.id;
@@ -1602,6 +1608,8 @@ this.buildConstellationClickPolygons();
                 canvas.style.cursor = 'pointer';
                 return;
             }
+        } else {
+            this._lastHoverMessierId = null;
         }
 
 // Remover highlight anterior
@@ -1629,7 +1637,7 @@ this.buildConstellationClickPolygons();
             this.highlightedConstellation = pickedAbbr;
             canvas.style.cursor = 'crosshair';
         } else {
-            canvas.style.cursor = 'pointer';
+            canvas.style.cursor = 'default';
         }
     }
 
@@ -2082,7 +2090,7 @@ this.buildConstellationClickPolygons();
 
         this.geodesicLines.forEach((lines, abbr) => {
             const key = this._normalizeAbbr(abbr);
-            const shouldShow = this.revealedConstellations.has(key);
+            const shouldShow = !!this.gameOptions?.game1ShowBoundaries && this.revealedConstellations.has(key);
             if (!lines) return;
             lines.forEach(line => { if (line) line.visible = shouldShow; });
         });
@@ -2135,6 +2143,8 @@ this.buildConstellationClickPolygons();
         if (typeof opts.showDiscoveredFill === 'boolean') this.gameOptions.showDiscoveredFill = opts.showDiscoveredFill;
         if (typeof opts.showDiscoveredNames === 'boolean') this.gameOptions.showDiscoveredNames = opts.showDiscoveredNames;
         if (typeof opts.showProgress === 'boolean') this.gameOptions.showProgress = opts.showProgress;
+        if (typeof opts.game1ShowBoundaries === 'boolean') this.gameOptions.game1ShowBoundaries = opts.game1ShowBoundaries;
+        if (typeof opts.game1ShowLabels === 'boolean') this.gameOptions.game1ShowLabels = opts.game1ShowLabels;
 
         if (this.gameMode) {
             this._syncBoundaryVisibilityForGame();
@@ -2177,7 +2187,7 @@ this.buildConstellationClickPolygons();
         this.constellationLabels.forEach((label, abbr) => {
             if (!label) return;
             const key = this._normalizeAbbr(abbr);
-            const should = show && this.revealedConstellations && this.revealedConstellations.has(key);
+            const should = show && !!this.gameOptions?.game1ShowLabels && this.revealedConstellations && this.revealedConstellations.has(key);
             label.visible = !!should;
             if (label.material) {
                 label.material.transparent = true;
@@ -2396,7 +2406,7 @@ this.buildConstellationClickPolygons();
     }
 
 
-    startGameMode(selectedConstellationAbbr) {
+    startGameMode(selectedConstellationAbbr, opts = {}) {
         // ✅ Isolar o treino de constelações: Messier NÃO pode aparecer nem capturar clique no modo jogo.
         // Salva o estado atual (ou o "desejado" pela UI) para restaurar depois.
         this._messierVisibleBeforeGame = this.messierVisible;
@@ -2409,6 +2419,13 @@ this.buildConstellationClickPolygons();
         this.gameMode = true;
         this.selectedConstellation = selectedConstellationAbbr;
         this.hideConstellationInfo();
+
+        if (opts && typeof opts === 'object') {
+            this.setGameOptions({
+                game1ShowBoundaries: opts.showBoundaries !== undefined ? !!opts.showBoundaries : this.gameOptions.game1ShowBoundaries,
+                game1ShowLabels: opts.showLabels !== undefined ? !!opts.showLabels : this.gameOptions.game1ShowLabels
+            });
+        }
 
         // Estado de revelação
         if (!this.revealedConstellations) this.revealedConstellations = new Set();

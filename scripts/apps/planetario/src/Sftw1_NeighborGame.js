@@ -322,7 +322,7 @@ class Sftw1_NeighborGame {
         if (!difficulty) difficulty = 'easy';
         if (!['easy', 'hidden-count'].includes(difficulty)) difficulty = 'easy';
 
-        let orderMode = String(options.orderMode || '').trim().toLowerCase();
+        let orderMode = String(options.orderMode || options.sequenceMode || '').trim().toLowerCase();
         if (!orderMode) {
             orderMode = selectedTarget ? 'selected' : 'alphabetical';
         }
@@ -548,6 +548,14 @@ class Sftw1_NeighborGame {
         }
 
         return { original, normalized };
+    }
+
+    _getPortugueseFallback(abbr) {
+        if (!abbr) return '';
+        if (typeof this.sftw?.getConstellationNamePt === 'function') {
+            return this.sftw.getConstellationNamePt(abbr) || '';
+        }
+        return '';
     }
 
     _resolveToAbbr(normalizedText) {
