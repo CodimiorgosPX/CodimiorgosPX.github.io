@@ -2,10 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tabela Periódica | Observatório Virtual</title>
 
   <style>
@@ -14,7 +11,6 @@
       --bg-2: #0b1728;
       --bg-3: #12243d;
       --panel: rgba(255, 255, 255, 0.07);
-      --panel-strong: rgba(255, 255, 255, 0.1);
       --border: rgba(255, 255, 255, 0.12);
       --text: #eef4ff;
       --muted: #a8b6cb;
@@ -24,18 +20,13 @@
       --hidden: rgba(255, 255, 255, 0.07);
       --hidden-hover: rgba(255, 255, 255, 0.13);
       --empty: transparent;
-      --shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.30);
       --success: #7ae6a0;
       --danger: #ff8b8b;
-      --warning: #ffd166;
-
-      --topbar-height: 84px;
-      --mobile-answer-bar-height: 86px;
     }
 
     * {
       box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
     }
 
     html, body {
@@ -47,17 +38,17 @@
         radial-gradient(circle at top left, rgba(98, 168, 255, 0.16), transparent 28%),
         radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 20%),
         linear-gradient(155deg, var(--bg-1), var(--bg-2) 48%, var(--bg-3));
-      overflow-x: hidden;
     }
 
     body {
       overflow-y: auto;
-      overscroll-behavior-y: contain;
-      -webkit-text-size-adjust: 100%;
+      overflow-x: hidden;
+      overscroll-behavior-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     .page {
-      min-height: 100dvh;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
@@ -74,14 +65,13 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
       position: sticky;
       top: 0;
-      z-index: 20;
+      z-index: 5;
     }
 
     .topbar-left {
       display: flex;
       flex-direction: column;
       gap: 4px;
-      min-width: 0;
     }
 
     .title {
@@ -110,7 +100,6 @@
       font-weight: 700;
       cursor: pointer;
       transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
-      touch-action: manipulation;
     }
 
     button:hover {
@@ -158,7 +147,6 @@
       gap: 18px;
       padding: 18px;
       align-items: start;
-      min-height: 0;
     }
 
     .board-panel,
@@ -168,14 +156,13 @@
       border-radius: 22px;
       box-shadow: var(--shadow);
       backdrop-filter: blur(10px);
-      min-width: 0;
     }
 
     .board-panel {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      min-height: 0;
+      min-width: 0;
     }
 
     .board-header {
@@ -216,16 +203,11 @@
       font-size: 13px;
       max-width: 330px;
       text-align: right;
-      flex-shrink: 0;
+      flex: none;
     }
 
     .board-wrap {
-      overflow: auto;
       padding: 22px;
-      min-height: 0;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-      touch-action: pan-x pan-y;
     }
 
     .table-shell {
@@ -283,8 +265,19 @@
       border: 1px dashed rgba(255, 255, 255, 0.12);
     }
 
+    .grid-scroller {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pan-y;
+      overscroll-behavior-x: contain;
+      padding-bottom: 6px;
+    }
+
     .grid-frame {
       width: max-content;
+      min-width: 100%;
       padding: 18px;
       border-radius: 24px;
       background:
@@ -301,6 +294,7 @@
       gap: 8px;
       width: max-content;
       padding-bottom: 8px;
+      touch-action: pan-x pan-y;
     }
 
     .cell {
@@ -316,6 +310,7 @@
       overflow: hidden;
       font-size: 14px;
       min-width: 0;
+      touch-action: manipulation;
     }
 
     .empty {
@@ -333,7 +328,6 @@
       font-weight: 700;
       color: rgba(255, 255, 255, 0.94);
       backdrop-filter: blur(4px);
-      touch-action: manipulation;
     }
 
     .hidden-slot:hover {
@@ -341,14 +335,6 @@
       background: var(--hidden-hover);
       border-color: rgba(127, 208, 255, 0.35);
       box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
-    }
-
-    .hidden-slot.selected-mobile {
-      outline: 2px solid rgba(127, 208, 255, 0.85);
-      outline-offset: 2px;
-      background: rgba(98, 168, 255, 0.18);
-      border-color: rgba(127, 208, 255, 0.55);
-      box-shadow: 0 0 0 4px rgba(90, 168, 255, 0.10);
     }
 
     .element {
@@ -533,46 +519,11 @@
       opacity: 0.9;
     }
 
-    .mobile-answer-bar {
-      display: none;
-    }
-
-    .mobile-answer-inner {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .mobile-answer-meta {
-      min-width: 0;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .mobile-answer-title {
-      font-size: 13px;
-      color: var(--muted);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-
-    .mobile-answer-slot {
-      font-size: 13px;
-      color: var(--text);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .mobile-answer-open-btn {
-      flex: none;
-      white-space: nowrap;
-    }
-
     @media (max-width: 1180px) {
+      .topbar {
+        position: static;
+      }
+
       .main-layout {
         grid-template-columns: 1fr;
       }
@@ -582,147 +533,74 @@
       }
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 900px), (pointer: coarse) {
+      body {
+        overflow-y: auto;
+      }
+
+      .main-layout {
+        padding: 12px;
+        gap: 12px;
+      }
+
+      .board-panel,
+      .side-panel {
+        border-radius: 18px;
+      }
+
+      .board-wrap {
+        padding: 14px;
+        overflow: visible;
+      }
+
+      .grid-scroller {
+        overflow-x: auto;
+        overflow-y: visible;
+      }
+
+      .grid-frame {
+        padding: 12px;
+      }
+
+      .side-panel {
+        padding: 14px;
+        gap: 12px;
+      }
+
+      #discovery-list {
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 720px) {
       .topbar {
         align-items: flex-start;
         flex-direction: column;
         padding: 14px 16px;
-        gap: 12px;
-      }
-
-      .title {
-        font-size: 22px;
-      }
-
-      .subtitle {
-        font-size: 13px;
-      }
-
-      .topbar-actions {
-        width: 100%;
-      }
-
-      .topbar-actions > * {
-        width: 100%;
-      }
-
-      .main-layout {
-        padding: 10px;
-        gap: 10px;
       }
 
       .board-header {
         flex-direction: column;
         align-items: flex-start;
-        padding: 14px 14px 12px;
-      }
-
-      .status-badge {
-        max-width: 100%;
-        text-align: left;
-      }
-
-      .board-wrap {
-        padding: 10px;
-      }
-
-      .table-caption,
-      .legend {
-        display: none;
-      }
-
-      .grid-frame {
-        padding: 8px;
-        border-radius: 18px;
       }
 
       #table-grid {
-        grid-template-columns: repeat(18, 46px);
-        grid-auto-rows: 46px;
-        gap: 4px;
+        grid-template-columns: repeat(18, 60px);
+        grid-auto-rows: 60px;
+        gap: 6px;
       }
 
       .cell {
-        border-radius: 10px;
-        font-size: 11px;
-        padding: 3px;
-      }
-
-      .side-panel {
-        padding: 12px;
-        gap: 10px;
-      }
-
-      .side-card {
-        padding: 12px;
         border-radius: 14px;
+        font-size: 13px;
       }
 
-      .side-card h3 {
-        font-size: 15px;
+      .title {
+        font-size: 24px;
       }
 
-      .side-card.mobile-collapse {
-        display: none;
-      }
-
-      .desktop-answer-card {
-        display: none;
-      }
-
-      .mobile-answer-bar {
-        display: block;
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 40;
-        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-        background: rgba(7, 12, 22, 0.96);
-        border-top: 1px solid rgba(255,255,255,0.10);
-        backdrop-filter: blur(12px);
-        box-shadow: 0 -10px 24px rgba(0,0,0,0.22);
-      }
-
-      .page {
-        padding-bottom: calc(var(--mobile-answer-bar-height) + env(safe-area-inset-bottom));
-      }
-
-      body.keyboard-open .topbar {
-        position: static;
-      }
-
-      body.keyboard-open .mobile-answer-bar {
-        box-shadow: 0 -14px 30px rgba(0,0,0,0.28);
-      }
-
-      body.keyboard-open .side-card.mobile-collapse {
-        display: none !important;
-      }
-
-      body.keyboard-open .board-header p {
-        display: none;
-      }
-    }
-
-    @media (max-width: 420px) {
-      #table-grid {
-        grid-template-columns: repeat(18, 42px);
-        grid-auto-rows: 42px;
-        gap: 3px;
-      }
-
-      .cell {
-        font-size: 10px;
-        border-radius: 9px;
-      }
-
-      .board-wrap {
-        padding: 8px;
-      }
-
-      .main-layout {
-        padding: 8px;
+      .subtitle {
+        font-size: 13px;
       }
     }
   </style>
@@ -747,17 +625,17 @@
             <h2>Monte a tabela</h2>
             <p>
               Reconstrua a tabela periódica a partir da memória espacial.
-              Os espaços inexistentes ficam invisíveis para a forma real da tabela aparecer melhor.
+              Em tablet e celular, a página deve rolar naturalmente e a grade pode ser arrastada lateralmente.
             </p>
           </div>
 
           <div id="status" class="status-badge">Aguardando carregamento...</div>
         </div>
 
-        <div class="board-wrap" id="board-wrap">
+        <div class="board-wrap">
           <div class="table-shell">
             <div class="table-caption">
-              Clique em um bloco oculto, tente responder pelo símbolo ou nome do elemento e acompanhe seu progresso na lateral.
+              Clique em um bloco oculto, responda pelo símbolo ou nome e acompanhe o progresso na lateral.
             </div>
 
             <div class="legend">
@@ -775,8 +653,10 @@
               </div>
             </div>
 
-            <div class="grid-frame">
-              <div id="table-grid"></div>
+            <div class="grid-scroller">
+              <div class="grid-frame">
+                <div id="table-grid"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -788,7 +668,7 @@
           <div id="selected-slot">Nenhum espaço selecionado.</div>
         </div>
 
-        <div class="side-card desktop-answer-card">
+        <div class="side-card">
           <h3>Responder elemento</h3>
           <div class="input-wrap">
             <label for="answer-input">Nome ou símbolo</label>
@@ -797,9 +677,6 @@
               type="text"
               placeholder="Ex.: Na ou Sódio"
               autocomplete="off"
-              autocorrect="off"
-              autocapitalize="none"
-              enterkeyhint="done"
               spellcheck="false"
             />
           </div>
@@ -846,7 +723,7 @@
           </div>
         </div>
 
-        <div class="side-card mobile-collapse">
+        <div class="side-card">
           <h3>Ordem de descoberta</h3>
           <div id="discovery-empty" class="tip-list">
             <span>Nenhum elemento registrado ainda.</span>
@@ -854,7 +731,7 @@
           <ol id="discovery-list" style="display:none;"></ol>
         </div>
 
-        <div class="side-card mobile-collapse">
+        <div class="side-card">
           <h3>Como jogar</h3>
           <div class="tip-list">
             <span>• Clique em <strong>Iniciar jogo</strong> para revelar o primeiro elemento.</span>
@@ -864,27 +741,11 @@
           </div>
         </div>
 
-        <div class="footer-note mobile-collapse">
-          Próximo refinamento ideal: separar visualmente lantanídeos e actinídeos com rótulos próprios na renderização.
+        <div class="footer-note">
+          Próximo arquivo: ajustar o JavaScript para seleção automática do bloco vizinho após cada acerto.
         </div>
       </aside>
     </main>
-
-    <div class="mobile-answer-bar" id="mobile-answer-bar">
-      <div class="mobile-answer-inner">
-        <div class="mobile-answer-meta">
-          <div class="mobile-answer-title">Resposta rápida</div>
-          <div id="mobile-selected-slot" class="mobile-answer-slot">Nenhum bloco selecionado.</div>
-        </div>
-        <button
-          id="mobile-open-input-btn"
-          class="ghost-action-btn mobile-answer-open-btn"
-          type="button"
-        >
-          Digitar resposta
-        </button>
-      </div>
-    </div>
   </div>
 
   <script type="module" src="./app.js"></script>

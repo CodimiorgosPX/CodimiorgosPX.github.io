@@ -45,7 +45,13 @@ class Sftw1_MessierGame {
             lastAngleErrorDeg: null,
 
             startedAt: 0,
-            elapsedMs: 0
+            elapsedMs: 0,
+
+            targetStartedAt: 0,
+            targetElapsedMs: 0,
+            targetTimesMs: {},
+            discoveredOrder: [],
+            hits: []
         };
     }
 
@@ -108,6 +114,56 @@ class Sftw1_MessierGame {
 
         ids.sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
         return ids;
+    }
+
+    _getNow() {
+        return Date.now();
+    }
+
+    _startTargetClock(targetId = null) {
+        const key = this._normalizeMessierId(targetId || this.state.targetId);
+        this.state.targetId = key || this.state.targetId || null;
+        this.state.targetStartedAt = this._getNow();
+        this.state.targetElapsedMs = 0;
+        return this.state.targetStartedAt;
+    }
+
+    _captureCurrentTargetElapsedMs() {
+        if (!this.state.targetStartedAt || !this.state.targetId) {
+            this.state.targetElapsedMs = Number(this.state.targetElapsedMs || 0);
+            return this.state.targetElapsedMs;
+        }
+
+        this.state.targetElapsedMs = Math.max(0, this._getNow() - this.state.targetStartedAt);
+        return this.state.targetElapsedMs;
+    }
+
+    _finalizeCurrentTargetTime(targetId = null) {
+        const key = this._normalizeMessierId(targetId || this.state.targetId);
+        if (!key) return Number(this.state.targetElapsedMs || 0);
+
+        const elapsed = this._captureCurrentTargetElapsedMs();
+        this.state.targetTimesMs[key] = elapsed;
+        return elapsed;
+    }
+
+    _buildHitEntry(targetId, meta = {}) {
+        const key = this._normalizeMessierId(targetId);
+        if (!key) return null;
+
+        const sessionElapsedMs = this.state.startedAt > 0
+            ? Math.max(0, this._getNow() - this.state.startedAt)
+            : Number(this.state.elapsedMs || 0);
+
+        return {
+            order: this.state.discoveredOrder.length + 1,
+            id: key,
+            targetElapsedMs: Number(meta.targetElapsedMs || 0),
+            sessionElapsedMs,
+            errors: Number(this.state.errorsById[key] || 0),
+            discoveredAt: this._getNow(),
+            targetStartedAt: Number(this.state.targetStartedAt || 0)
+        };
     }
 
     _pickNextTargetId() {
@@ -257,6 +313,7 @@ class Sftw1_MessierGame {
         }
 
         this.state.lastAngleErrorDeg = null;
+        this._startTargetClock(this.state.targetId);
         this._publishState({ type: 'start' });
         this._emitStart();
 
@@ -270,6 +327,7 @@ class Sftw1_MessierGame {
         if (this.state.startedAt > 0) {
             this.state.elapsedMs = Math.max(0, Date.now() - this.state.startedAt);
         }
+        this._captureCurrentTargetElapsedMs();
 
         this.state.active = false;
         this.state.finished = true;
@@ -363,6 +421,7 @@ class Sftw1_MessierGame {
 
         if (this.state.active) {
             this.state.targetId = normalized;
+            this._startTargetClock(normalized);
             this._publishState({ type: 'target' });
         } else {
             this._publishState({ type: 'manual-target' });
@@ -420,11 +479,12 @@ class Sftw1_MessierGame {
         }
 
         this.state.targetId = next;
+        this._startTargetClock(next);
         this._publishState({ type: 'advance' });
         return next;
     }
 
-    _markDiscovered(id) {
+    _markDiscovered(id, meta = {}) {
         const key = this._normalizeMessierId(id);
         if (!key) return false;
 
@@ -432,6 +492,13 @@ class Sftw1_MessierGame {
 
         this.state.discovered.add(key);
         this.state.lastAngleErrorDeg = null;
+
+        const entry = this._buildHitEntry(key, meta);
+        if (entry) {
+            this.state.discoveredOrder.push(key);
+            this.state.hits.push(entry);
+        }
+
         return true;
     }
 
@@ -470,7 +537,9 @@ class Sftw1_MessierGame {
     _registerHit(hitId) {
         const key = this._normalizeMessierId(hitId);
         const currentTarget = this._normalizeMessierId(this.state.targetId);
-        const wasNew = this._markDiscovered(key);
+        const targetElapsedMs = this._finalizeCurrentTargetTime(currentTarget);
+        const wasNew = this._markDiscovered(key, { targetElapsedMs });
+        const hitEntry = this.state.hits[this.state.hits.length - 1] || null;
 
         const currentState = this.getGameState();
         const payload = {
@@ -479,6 +548,8 @@ class Sftw1_MessierGame {
             targetId: currentTarget,
             discoveredCount: this.state.discovered.size,
             wasNew,
+            targetElapsedMs,
+            hitEntry,
             message: `✅ Acertou ${key}.`,
             state: currentState
         };
@@ -486,7 +557,8 @@ class Sftw1_MessierGame {
         this._publishState({
             type: 'hit',
             hitId: key,
-            targetId: currentTarget
+            targetId: currentTarget,
+            targetElapsedMs
         });
 
         this._emitHit(payload);
@@ -494,6 +566,7 @@ class Sftw1_MessierGame {
         if (this.state.autoAdvance) {
             this._advanceTargetIfNeeded();
         } else {
+            this._captureCurrentTargetElapsedMs();
             this._publishState({ type: 'post-hit' });
         }
 
@@ -561,6 +634,12 @@ class Sftw1_MessierGame {
     getGameState() {
         const total = this.state.orderedIds.length || this._buildOrderedIds().length || 0;
         const discoveredCount = this.state.discovered.size || 0;
+        const elapsedMs = this.state.startedAt > 0 && this.state.active
+            ? Math.max(0, Date.now() - this.state.startedAt)
+            : Number(this.state.elapsedMs || 0);
+        const targetElapsedMs = this.state.targetStartedAt > 0 && this.state.active
+            ? Math.max(0, Date.now() - this.state.targetStartedAt)
+            : Number(this.state.targetElapsedMs || 0);
 
         return {
             active: !!this.state.active,
@@ -584,12 +663,30 @@ class Sftw1_MessierGame {
             progress: total > 0 ? discoveredCount / total : 0,
 
             orderedIds: this.state.orderedIds.slice(),
+            discoveredOrder: this.state.discoveredOrder.slice(),
+            hits: this.state.hits.map(hit => ({ ...hit })),
+            targetTimesMs: { ...this.state.targetTimesMs },
+            targetElapsedMs,
             lastAngleErrorDeg: this.state.lastAngleErrorDeg,
 
             startedAt: this.state.startedAt,
-            elapsedMs: this.state.startedAt > 0 && this.state.active
-                ? Math.max(0, Date.now() - this.state.startedAt)
-                : Number(this.state.elapsedMs || 0)
+            elapsedMs
+        };
+    }
+
+
+    getTargetStats(id) {
+        const key = this._normalizeMessierId(id);
+        if (!key) return null;
+
+        const hit = this.state.hits.find(item => item.id === key) || null;
+        return {
+            id: key,
+            discovered: this.state.discovered.has(key),
+            errors: Number(this.state.errorsById[key] || 0),
+            targetElapsedMs: Number(this.state.targetTimesMs[key] || 0),
+            order: hit?.order || null,
+            hit: hit ? { ...hit } : null
         };
     }
 
@@ -618,6 +715,7 @@ function injectMessierGameMethods(sftwInstance) {
     sftwInstance.getMessierGameState = () => game.getGameState();
     sftwInstance.getMessierGameReport = () => game.getFinalReport();
     sftwInstance.getMessierGameConfig = () => game.getConfigState();
+    sftwInstance.getMessierTargetStats = (id) => game.getTargetStats(id);
 
     sftwInstance.setMessierGameOptions = (opts = {}) => game.applyConfiguration(opts);
     sftwInstance.configureMessierGame = (opts = {}) => game.configureGame(opts);

@@ -95,17 +95,9 @@ class Sftw1 {
         // ============================================
         // 10. SISTEMA DE CALLBACKS
         // ============================================
-        this.callbacks = {
-            onConstellationClick: null,
-            onGameStart: null,
-            onGameEnd: null,
-
-            // Jogo / UI
-            onGameStateChange: null,
-            onConstellationDiscovered: null,
-            onWrongAnswer: null,
-            onCorrectAnswer: null
-        };
+        this.callbacks = {};
+        this.callbackListeners = {};
+        this._initializeDefaultCallbacks();
 
         // ============================================
         // 11. DIFICULDADES
@@ -388,26 +380,94 @@ class Sftw1 {
     // ============================================
     // SISTEMA DE CALLBACKS
     // ============================================
-    registerCallback(event, callback) {
-        if (!event || typeof callback !== 'function') return;
+    _getDefaultCallbackEvents() {
+        return [
+            'onConstellationClick',
+            'onGameStart',
+            'onGameEnd',
+            'onGameStateChange',
+            'onConstellationDiscovered',
+            'onWrongAnswer',
+            'onCorrectAnswer'
+        ];
+    }
 
-        // Permite eventos novos sem quebrar: cria slot se não existir
+    _ensureCallbackEvent(event) {
+        const name = String(event || '').trim();
+        if (!name) return '';
+
         if (!this.callbacks) this.callbacks = {};
-        if (!(event in this.callbacks)) this.callbacks[event] = null;
+        if (!this.callbackListeners) this.callbackListeners = {};
 
-        this.callbacks[event] = callback;
+        if (!Array.isArray(this.callbackListeners[name])) {
+            this.callbackListeners[name] = [];
+        }
+
+        if (typeof this.callbacks[name] !== 'function') {
+            this.callbacks[name] = (...args) => this._emitCallbackEvent(name, ...args);
+        }
+
+        return name;
+    }
+
+    _initializeDefaultCallbacks() {
+        const events = this._getDefaultCallbackEvents();
+        events.forEach((eventName) => this._ensureCallbackEvent(eventName));
+    }
+
+    _emitCallbackEvent(event, ...args) {
+        const name = this._ensureCallbackEvent(event);
+        if (!name) return;
+
+        const listeners = this.callbackListeners[name];
+        if (!Array.isArray(listeners) || listeners.length === 0) return;
+
+        const snapshot = listeners.slice();
+        for (const listener of snapshot) {
+            if (typeof listener !== 'function') continue;
+            try {
+                listener(...args);
+            } catch (err) {
+                console.error(`❌ Erro em callback ${name}:`, err);
+            }
+        }
+    }
+
+    registerCallback(event, callback) {
+        if (!event || typeof callback !== 'function') return false;
+
+        const name = this._ensureCallbackEvent(event);
+        if (!name) return false;
+
+        const listeners = this.callbackListeners[name];
+        if (!listeners.includes(callback)) {
+            listeners.push(callback);
+        }
+
+        return true;
+    }
+
+    unregisterCallback(event, callback = null) {
+        const name = this._ensureCallbackEvent(event);
+        if (!name) return false;
+
+        if (callback === null) {
+            this.callbackListeners[name] = [];
+            return true;
+        }
+
+        const listeners = this.callbackListeners[name];
+        const index = listeners.indexOf(callback);
+        if (index >= 0) {
+            listeners.splice(index, 1);
+            return true;
+        }
+
+        return false;
     }
 
     triggerCallback(event, ...args) {
-        if (!this.callbacks) return;
-        const cb = this.callbacks[event];
-        if (typeof cb === 'function') {
-            try {
-                cb(...args);
-            } catch (err) {
-                console.error(`❌ Erro em callback ${event}:`, err);
-            }
-        }
+        this._emitCallbackEvent(event, ...args);
     }
 
     // ============================================
@@ -531,17 +591,9 @@ class Sftw1 {
         this.stars = [];
 
         // Limpar callbacks
-        this.callbacks = {
-            onConstellationClick: null,
-            onGameStart: null,
-            onGameEnd: null,
-
-            // Jogo / UI
-            onGameStateChange: null,
-            onConstellationDiscovered: null,
-            onWrongAnswer: null,
-            onCorrectAnswer: null
-        };
+        this.callbacks = {};
+        this.callbackListeners = {};
+        this._initializeDefaultCallbacks();
 
         this.isInitialized = false;
 

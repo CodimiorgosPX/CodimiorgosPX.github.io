@@ -39,22 +39,7 @@ class Sftw1_Visualization {
         this._messierWantedDuringGame = null;
 
         // Jogo do Messier (sessão separada do catálogo visual)
-        this.messierGame = {
-            active: false,
-            finished: false,
-            targetId: null,
-            manualTargetId: null,
-            randomOrder: false,
-            autoAdvance: true,
-            showErrorHint: true,
-            toleranceDeg: 1.2,
-            totalErrors: 0,
-            errorsById: {},
-            discovered: new Set(),
-            orderedIds: [],
-            lastAngleErrorDeg: null,
-            startedAt: 0
-        };
+        this.messierGame = this._createDefaultMessierGameState();
 
         this.gameMode = false;
         this.darkenedObjects = [];
@@ -77,23 +62,6 @@ class Sftw1_Visualization {
         this.currentInfoConstellation = null;
         this.currentInfoStar = null;
         this.currentInfoType = null;
-
-        this.messierGame = {
-            active: false,
-            finished: false,
-            targetId: null,
-            manualTargetId: null,
-            randomOrder: false,
-            autoAdvance: true,
-            showErrorHint: true,
-            toleranceDeg: 1.2,
-            totalErrors: 0,
-            errorsById: {},
-            discovered: new Set(),
-            orderedIds: [],
-            lastAngleErrorDeg: null,
-            startedAt: 0
-        };
 
         // Estudo de estrelas (filtros aplicados pela aba "Estrelas")
         this.starStudyFilter = {
@@ -120,6 +88,69 @@ class Sftw1_Visualization {
         // Map<abbr, { ok: boolean, loops: Array<{ n,u,v, poly2, bbox }>, failReason?: string }>
         this.constellationClickPolygons = new Map();
         this.constellationClickPolygonsBuilt = false;
+
+        // =========================
+        // ASTERISMOS (modo explorar)
+        // =========================
+        this.asterismGroup = null;
+        this.asterismLines = new Map();      // id -> THREE.Line[]
+        this.asterismLabels = new Map();     // id -> THREE.Sprite
+        this.asterismsVisible = false;
+        this.asterismLabelsVisible = false;
+
+        // =========================
+        // ASTERISM GAME (modo conectar pontos)
+        // =========================
+        this.asterismGameOverlay = null;
+        this.asterismGameTargetGroup = null;
+        this.asterismGameUserGroup = null;
+        this.asterismGamePendingGroup = null;
+        this.asterismGameState = {
+            targetId: null,
+            selectedStarKey: null,
+            userSegments: [],
+            allowedStarKeys: new Set(),
+            starMap: new Map(),
+            isSolvedVisual: false,
+            lastSubmissionResult: null
+        };
+    }
+
+    _createDefaultMessierGameState() {
+        return {
+            active: false,
+            finished: false,
+            targetId: null,
+            manualTargetId: null,
+            randomOrder: false,
+            autoAdvance: true,
+            showErrorHint: true,
+            toleranceDeg: 1.2,
+            totalErrors: 0,
+            errorsById: {},
+            discovered: new Set(),
+            orderedIds: [],
+            lastAngleErrorDeg: null,
+            startedAt: 0
+        };
+    }
+
+    _getCanvasElement() {
+        return this.sftw?.sceneManager?.renderer?.domElement || this.sceneManager?.renderer?.domElement || document.getElementById('module-canvas') || null;
+    }
+
+    _removePrimaryInteractionBindings(canvas = null) {
+        const target = canvas || this._getCanvasElement();
+        if (!target) return;
+        if (this.boundMouseMove) target.removeEventListener('mousemove', this.boundMouseMove);
+        if (this.boundMouseClick) target.removeEventListener('click', this.boundMouseClick);
+    }
+
+    _removeMessierInteractionBindings(canvas = null) {
+        const target = canvas || this._getCanvasElement();
+        if (!target) return;
+        if (this._boundMessierClick) target.removeEventListener('click', this._boundMessierClick);
+        this._messierClickBound = false;
     }
 
     // ----------------------------
@@ -480,6 +511,10 @@ class Sftw1_Visualization {
         // (Messier) cria os marcadores uma única vez (se houver dados globais)
         // A visibilidade final é controlada por toggle/setting.
         this.createMessierMarkers();
+
+        // (Asterismos) cria a camada visual uma única vez.
+        this.createAsterismLayer();
+
 console.log('✅ Esfera celeste criada');
         return this.sftw.celestialSphere;
     }
@@ -1556,22 +1591,27 @@ this.buildConstellationClickPolygons();
 
     setupInteraction() {
         console.log('🖱️ Configurando interação...');
-        
-        const canvas = this.sftw.sceneManager.renderer.domElement;
-        
-        // Limpar eventos anteriores
-        canvas.removeEventListener('mousemove', this.boundMouseMove);
-        canvas.removeEventListener('click', this._boundMessierClick);
-        
+
+        const canvas = this._getCanvasElement();
+        if (!canvas) {
+            console.warn('⚠️ setupInteraction: canvas não encontrado');
+            return;
+        }
+
+        // Limpar apenas os handlers principais deste fluxo.
+        // O handler específico do Messier é gerenciado separadamente
+        // por initMessierMarkers / cleanup.
+        this._removePrimaryInteractionBindings(canvas);
+
         // Criar métodos bound
         this.boundMouseMove = this.onMouseMove.bind(this);
         this.boundMouseClick = this.onMouseClick.bind(this);
-        
+
         canvas.addEventListener('mousemove', this.boundMouseMove);
         canvas.addEventListener('click', this.boundMouseClick);
-        
+
         canvas.style.cursor = 'default';
-        
+
         console.log('✅ Interação configurada');
     }
     
@@ -1586,14 +1626,33 @@ this.buildConstellationClickPolygons();
         this.raycaster.setFromCamera(this.mouse, this.sftw.sceneManager.camera);
 
         // ✅ Prioridade de hover fora do jogo:
-        // 1) Messier
-        // 2) estrelas
-        // 3) constelações
+        // 1) asterismos
+        // 2) Messier
+        // 3) estrelas
+        // 4) constelações
         const messierActive = (typeof this.sftw?.isMessierGameActive === 'function')
             ? !!this.sftw.isMessierGameActive()
             : !!this.messierGame?.active;
+        const asterismGameActive = (typeof this.sftw?.getAsterismGameState === 'function')
+            ? !!this.sftw.getAsterismGameState()?.active
+            : false;
 
-        if (!this.gameMode && !messierActive) {
+        if (!this.gameMode && asterismGameActive) {
+            this.syncAsterismGameVisuals();
+            const starHit = this._pickStarUnderPointer?.(event);
+            if (starHit) {
+                canvas.style.cursor = 'pointer';
+                return;
+            }
+        }
+
+        if (!this.gameMode && !messierActive && !asterismGameActive) {
+            const asterismHit = this._pickAsterismUnderPointer?.(event);
+            if (asterismHit) {
+                canvas.style.cursor = 'pointer';
+                return;
+            }
+
             const mh = this._pickMessierUnderPointer?.(event);
             if (mh && mh.id) {
                 this._lastHoverMessierId = mh.id;
@@ -1660,6 +1719,15 @@ this.buildConstellationClickPolygons();
 
         this.raycaster.setFromCamera(this.mouse, this.sftw.sceneManager.camera);
 
+        const asterismGameActive = (typeof this.sftw?.getAsterismGameState === 'function')
+            ? !!this.sftw.getAsterismGameState()?.active
+            : false;
+
+        if (!this.gameMode && asterismGameActive) {
+            this.syncAsterismGameVisuals();
+            if (this._processAsterismGameClick(event)) return;
+        }
+
         // ✅ Sessão do jogo Messier tem prioridade fora do jogo das constelações
         const messierActive = (typeof this.sftw?.isMessierGameActive === 'function')
             ? !!this.sftw.isMessierGameActive()
@@ -1668,9 +1736,23 @@ this.buildConstellationClickPolygons();
             if (this._processMessierGameClick(event)) return;
         }
 
-                // ✅ Clique em Messier: mostra info e consome o clique (não spamma)
-        // (no modo jogo, Messier não deve interferir no treino de constelações)
+                // ✅ Clique em Asterismo: mostra info e consome o clique
         if (!this.gameMode) {
+            const clickedAsterism = this._pickAsterismUnderPointer?.(event);
+            if (clickedAsterism) {
+                const asterismKey = String(clickedAsterism.id || '');
+                if (this.currentInfoType === 'asterism' && this.currentInfoStar === asterismKey && this.infoContainer) {
+                    this.hideConstellationInfo();
+                    return;
+                }
+                this.currentInfoStar = asterismKey;
+                this.showAsterismInfo(clickedAsterism, clickedAsterism.point || null);
+                console.log('✨ Asterism click:', clickedAsterism);
+                return;
+            }
+
+            // ✅ Clique em Messier: mostra info e consome o clique (não spamma)
+            // (no modo jogo, Messier não deve interferir no treino de constelações)
             const clickedMh = this._pickMessierUnderPointer?.(event);
             if (clickedMh && clickedMh.id) {
                 this.selectedMessier = clickedMh.id;
@@ -2079,6 +2161,301 @@ this.buildConstellationClickPolygons();
         return colors[Math.abs(hash) % colors.length];
     }
     
+
+    // ============================================
+    // ASTERISMOS - CAMADA VISUAL DO MODO EXPLORAR
+    // ============================================
+
+    createAsterismLayer() {
+        if (!this.sftw?.sceneManager?.scene) return null;
+
+        this.clearAsterismLayer();
+
+        this.asterismGroup = new THREE.Group();
+        this.asterismGroup.name = 'sftw-asterisms';
+        this.sftw.sceneManager.scene.add(this.asterismGroup);
+
+        const asterisms = (typeof this.sftw?.getPlayableAsterisms === 'function')
+            ? (this.sftw.getPlayableAsterisms() || [])
+            : [];
+
+        if (!asterisms.length) {
+            this._syncAsterismVisibility();
+            console.warn('⚠️ Nenhum asterismo jogável disponível para renderização.');
+            return this.asterismGroup;
+        }
+
+        for (const asterism of asterisms) {
+            this._createSingleAsterismVisual(asterism);
+        }
+
+        this._syncAsterismVisibility();
+        console.log(`✨ ${this.asterismLines.size} asterismos visuais criados`);
+        return this.asterismGroup;
+    }
+
+    _createSingleAsterismVisual(asterism) {
+        if (!asterism || !asterism.isPlayable) return;
+
+        const starMap = new Map((asterism.stars || []).map(s => [s.localId, s]));
+        const lines = [];
+
+        for (const seg of (asterism.segments || [])) {
+            const sa = starMap.get(seg.aLocalId);
+            const sb = starMap.get(seg.bLocalId);
+            const aStar = sa?.star || null;
+            const bStar = sb?.star || null;
+            if (!aStar || !bStar) continue;
+
+            const p1 = this.sftw.raDecToVector3(aStar.ra, aStar.dec, this.sftw.settings.sphereRadius - 2.0);
+            const p2 = this.sftw.raDecToVector3(bStar.ra, bStar.dec, this.sftw.settings.sphereRadius - 2.0);
+
+            const geometry = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+            const material = new THREE.LineBasicMaterial({
+                color: 0xffd166,
+                transparent: true,
+                opacity: 0.95,
+                depthWrite: false
+            });
+
+            const line = new THREE.Line(geometry, material);
+            line.userData = {
+                type: 'asterism-line',
+                asterismId: asterism.id,
+                asterismName: asterism.name,
+                asterismNamePt: asterism.namePt || asterism.name,
+                culture: asterism.culture || 'unknown',
+                clickable: true,
+                selectable: true,
+                canonical: seg.canonical || null
+            };
+
+            this.asterismGroup.add(line);
+            lines.push(line);
+        }
+
+        if (!lines.length) return;
+        this.asterismLines.set(asterism.id, lines);
+
+        const label = this._createAsterismLabel(asterism);
+        if (label) this.asterismLabels.set(asterism.id, label);
+    }
+
+    _createAsterismLabel(asterism) {
+        const dir = this._getAsterismCenterDirection(asterism);
+        if (!dir) return null;
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const text = String(asterism.namePt || asterism.name || asterism.id || '').trim();
+        if (!text) return null;
+
+        const fontSize = 26;
+        ctx.font = `bold ${fontSize}px Arial`;
+        const width = Math.ceil(ctx.measureText(text).width) + 24;
+        const height = fontSize + 16;
+        canvas.width = Math.max(64, width);
+        canvas.height = Math.max(40, height);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'rgba(0,0,0,0.82)';
+        ctx.fillStyle = '#ffd166';
+        ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 0.95,
+            depthWrite: false
+        });
+
+        const sprite = new THREE.Sprite(material);
+        sprite.position.copy(dir.clone().multiplyScalar(this.sftw.settings.sphereRadius - 8));
+        sprite.scale.set(canvas.width * 0.24, canvas.height * 0.24, 1);
+        sprite.visible = false;
+        sprite.userData = {
+            type: 'asterism-label',
+            asterismId: asterism.id,
+            asterismName: asterism.name,
+            asterismNamePt: asterism.namePt || asterism.name,
+            aimDir: dir.clone().normalize()
+        };
+
+        this.asterismGroup.add(sprite);
+        return sprite;
+    }
+
+    _getAsterismCenterDirection(asterism) {
+        if (!asterism || !Array.isArray(asterism.stars) || !asterism.stars.length) return null;
+        const sum = new THREE.Vector3(0, 0, 0);
+        let count = 0;
+        for (const item of asterism.stars) {
+            const star = item?.star;
+            if (!star || !Number.isFinite(star.ra) || !Number.isFinite(star.dec)) continue;
+            sum.add(this.sftw.raDecToVector3(star.ra, star.dec, 1));
+            count += 1;
+        }
+        if (!count || sum.lengthSq() <= 1e-9) return null;
+        return sum.normalize();
+    }
+
+    clearAsterismLayer() {
+        if (this.asterismGroup) {
+            this.asterismGroup.traverse((obj) => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) {
+                    if (obj.material.map) obj.material.map.dispose();
+                    obj.material.dispose();
+                }
+            });
+            this.sftw?.sceneManager?.scene?.remove(this.asterismGroup);
+        }
+        this.asterismGroup = null;
+        this.asterismLines.clear();
+        this.asterismLabels.clear();
+    }
+
+    _syncAsterismVisibility() {
+        const showLines = !!this.asterismsVisible;
+        const showLabels = !!this.asterismsVisible && !!this.asterismLabelsVisible;
+
+        this.asterismLines.forEach((lines) => {
+            (lines || []).forEach((line) => { if (line) line.visible = showLines; });
+        });
+        this.asterismLabels.forEach((label) => {
+            if (label) label.visible = showLabels;
+        });
+    }
+
+    setAsterismsVisible(value) {
+        this.asterismsVisible = !!value;
+        if (!this.asterismGroup) this.createAsterismLayer();
+        this._syncAsterismVisibility();
+        return this.asterismsVisible;
+    }
+
+    setAsterismLabelsVisible(value) {
+        this.asterismLabelsVisible = !!value;
+        if (!this.asterismGroup) this.createAsterismLayer();
+        this._syncAsterismVisibility();
+        return this.asterismLabelsVisible;
+    }
+
+    _pickAsterismUnderPointer(ev) {
+        try {
+            if (!this.asterismsVisible || !this.asterismGroup) return null;
+            const renderer = this.sftw?.sceneManager?.renderer;
+            const camera = this.sftw?.sceneManager?.camera;
+            if (!renderer || !camera || !ev || ev.clientX == null || ev.clientY == null) return null;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            this.mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+            this.mouse.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
+            this.raycaster.setFromCamera(this.mouse, camera);
+            this.raycaster.params.Line = this.raycaster.params.Line || {};
+            this.raycaster.params.Line.threshold = 12;
+
+            const targets = [];
+            this.asterismLines.forEach((lines) => { if (lines?.length) targets.push(...lines); });
+            if (!targets.length) return null;
+
+            const hits = this.raycaster.intersectObjects(targets, false);
+            const best = (hits || []).find(h => h?.object?.userData?.type === 'asterism-line');
+            if (!best) return null;
+
+            const id = best.object.userData.asterismId;
+            const asterism = typeof this.sftw?.getAsterismById === 'function'
+                ? this.sftw.getAsterismById(id)
+                : null;
+            if (!asterism) return null;
+            return { ...asterism, point: best.point || null };
+        } catch (err) {
+            console.warn('⚠️ _pickAsterismUnderPointer falhou:', err);
+            return null;
+        }
+    }
+
+    showAsterismInfo(asterism, clickPosition = null) {
+        if (!asterism) return;
+        if (this.infoContainer) this.hideConstellationInfo();
+
+        this.currentInfoType = 'asterism';
+        this.currentInfoConstellation = null;
+        this.currentInfoStar = null;
+
+        const asterismId = String(asterism.id || '').trim();
+        const title = String(asterism.namePt || asterism.name || asterismId).trim();
+        const subtitle = asterism.name && asterism.name !== title ? asterism.name : '';
+        const stars = Array.isArray(asterism.stars) ? asterism.stars : [];
+        const starItems = stars.map((item) => {
+            const s = item?.star || {};
+            const name = (s.name || item?.refName || item?.localId || 'estrela').toString();
+            const con = (s.con || s.constellation || item?.refCon || '').toString();
+            return `<li style="margin-bottom:4px;"><strong>${name}</strong>${con ? ` <span style="color:#8b949e;">(${con})</span>` : ''}</li>`;
+        }).join('');
+
+        this.infoContainer = document.createElement('div');
+        this.infoContainer.id = 'constellation-info-container';
+        this.infoContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(20, 14, 2, 0.96);
+            border: 2px solid #ffd166;
+            border-radius: 12px;
+            padding: 1.25rem;
+            color: white;
+            max-width: 360px;
+            z-index: 1000;
+            font-family: 'Roboto', sans-serif;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            animation: infoSlideIn 0.3s ease;
+        `;
+
+        this.infoContainer.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;gap:12px;">
+                <div>
+                    <div style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:#ffd166;margin-bottom:0.25rem;">
+                        <i class="fas fa-wand-magic-sparkles"></i> ${title}
+                    </div>
+                    <div style="font-size:0.82rem;color:#c9d1d9;">${subtitle || 'Asterismo do modo explorar'}</div>
+                </div>
+                <button id="close-info-btn" style="background:none;border:none;color:#8b949e;font-size:1.2rem;cursor:pointer;padding:0;line-height:1;">✕</button>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+                <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.75rem;color:#8b949e;margin-bottom:0.25rem;">Estrelas</div>
+                    <div style="font-family:'Orbitron',sans-serif;color:#ffd166;">${stars.length}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.75rem;color:#8b949e;margin-bottom:0.25rem;">Segmentos</div>
+                    <div style="font-family:'Orbitron',sans-serif;color:#ffd166;">${(asterism.segments || []).length}</div>
+                </div>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:0.85rem;">
+                <div style="font-size:0.78rem;color:#8b949e;margin-bottom:0.5rem;">Estrelas que compõem o asterismo</div>
+                <ul style="margin:0;padding-left:1rem;max-height:180px;overflow:auto;">${starItems || '<li>Sem estrelas resolvidas.</li>'}</ul>
+            </div>
+        `;
+
+        document.body.appendChild(this.infoContainer);
+        const closeBtn = this.infoContainer.querySelector('#close-info-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.hideConstellationInfo();
+            });
+        }
+    }
+
     // ============================================
     // CONTROLES DE VISIBILIDADE
     // ============================================
@@ -2977,7 +3354,7 @@ clearGeodesicBoundaries() {
                 this.raycaster.params.Points.threshold = this.raycaster.params.Points.threshold ?? 0.08;
             }
 
-            const canvas = this.sceneManager?.renderer?.domElement || document.getElementById('module-canvas');
+            const canvas = this._getCanvasElement();
             if (canvas) {
                 this._boundMessierClick = (ev) => {
                     const messierActive = (typeof this.sftw?.isMessierGameActive === 'function') ? !!this.sftw.isMessierGameActive() : !!this.messierGame?.active;
@@ -3084,6 +3461,10 @@ clearGeodesicBoundaries() {
     }
 
     _emitMessierGameState() {
+        // Quando existe um controller canônico do Messier, ele próprio publica callbacks.
+        // Evitamos duplicar sinais a partir da Visualization.
+        if (this.sftw?.messierGameController) return;
+
         if (typeof this.sftw?.ui?.onMessierGameStateChanged === 'function') {
             this.sftw.ui.onMessierGameStateChanged(this.getMessierGameState());
         }
@@ -3091,6 +3472,12 @@ clearGeodesicBoundaries() {
 
     _syncMessierGameVisibility() {
         this.initMessierMarkers();
+
+        // Se já existe controller canônico, a fonte de verdade é o estado dele.
+        if (this.sftw?.messierGameController && typeof this.sftw.messierGameController.getGameState === 'function') {
+            this.syncMessierGameVisuals(this.sftw.messierGameController.getGameState());
+            return;
+        }
 
         if (!this.messierGroup) return;
         if (!this.messierGame.active) {
@@ -3442,7 +3829,501 @@ clearGeodesicBoundaries() {
     }
 
 
-    
+
+    // ============================================
+    // ASTERISM GAME - LIGAR PONTOS
+    // ============================================
+
+    _ensureAsterismGameOverlay() {
+        const scene = this.sftw?.sceneManager?.scene;
+        if (!scene) return false;
+
+        if (!this.asterismGameOverlay) {
+            this.asterismGameOverlay = new THREE.Group();
+            this.asterismGameOverlay.name = 'AsterismGameOverlay';
+            scene.add(this.asterismGameOverlay);
+        }
+        if (!this.asterismGameTargetGroup) {
+            this.asterismGameTargetGroup = new THREE.Group();
+            this.asterismGameTargetGroup.name = 'AsterismGameTargetGroup';
+            this.asterismGameOverlay.add(this.asterismGameTargetGroup);
+        }
+        if (!this.asterismGameSolvedGroup) {
+            this.asterismGameSolvedGroup = new THREE.Group();
+            this.asterismGameSolvedGroup.name = 'AsterismGameSolvedGroup';
+            this.asterismGameOverlay.add(this.asterismGameSolvedGroup);
+        }
+        if (!this.asterismGameUserGroup) {
+            this.asterismGameUserGroup = new THREE.Group();
+            this.asterismGameUserGroup.name = 'AsterismGameUserGroup';
+            this.asterismGameOverlay.add(this.asterismGameUserGroup);
+        }
+        if (!this.asterismGamePendingGroup) {
+            this.asterismGamePendingGroup = new THREE.Group();
+            this.asterismGamePendingGroup.name = 'AsterismGamePendingGroup';
+            this.asterismGameOverlay.add(this.asterismGamePendingGroup);
+        }
+        return true;
+    }
+
+    _clearThreeGroup(group) {
+        if (!group) return;
+        const children = group.children ? group.children.slice() : [];
+        for (const child of children) {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(mat => {
+                        if (mat?.map) mat.map.dispose();
+                        mat?.dispose?.();
+                    });
+                } else {
+                    if (child.material.map) child.material.map.dispose();
+                    child.material.dispose();
+                }
+            }
+            group.remove(child);
+        }
+    }
+
+    _makeAsterismResolvedStarKey(star) {
+        const con = star?.con || star?.constellation || "";
+        const name = star?.name || "star";
+        const ra = Number(star?.ra || 0).toFixed(6);
+        const dec = Number(star?.dec || 0).toFixed(6);
+        return `${con}|${name}|${ra}|${dec}`;
+    }
+
+    _getCurrentAsterismGameTargetData() {
+        const state = (typeof this.sftw?.getAsterismGameState === 'function')
+            ? this.sftw.getAsterismGameState()
+            : null;
+        const targetId = state?.currentAsterismId || state?.targetId || null;
+        if (!targetId) return null;
+
+        const asterism = (typeof this.sftw?.getAsterismById === 'function')
+            ? this.sftw.getAsterismById(targetId)
+            : null;
+        if (!asterism || !asterism.isPlayable) return null;
+
+        return { state, targetId: String(targetId), asterism };
+    }
+
+    _findAsterismGameStarHit(event) {
+        const hit = this._pickStarUnderPointer?.(event);
+        if (!hit) return null;
+
+        const key = this._makeAsterismResolvedStarKey(hit);
+        if (!this.asterismGameState.allowedStarKeys.has(key)) return null;
+
+        const targetItem = this.asterismGameState.starMap.get(key) || null;
+        return {
+            ...hit,
+            asterismKey: key,
+            targetItem
+        };
+    }
+
+    _drawAsterismGameLine(p1, p2, color = 0x00e5ff, opacity = 0.98, group = null) {
+        const host = group || this.asterismGameUserGroup;
+        if (!host) return null;
+        const geometry = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+        const material = new THREE.LineBasicMaterial({
+            color,
+            transparent: true,
+            opacity,
+            depthWrite: false
+        });
+        const line = new THREE.Line(geometry, material);
+        host.add(line);
+        return line;
+    }
+
+    _drawAsterismGameMarker(position, color = 0x7dd3fc, radius = 1.8, group = null) {
+        const host = group || this.asterismGameTargetGroup;
+        if (!host) return null;
+        const geometry = new THREE.SphereGeometry(radius, 12, 12);
+        const material = new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.92,
+            depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(position);
+        host.add(mesh);
+        return mesh;
+    }
+
+    _setPendingAsterismGameStar(starHit = null) {
+        this._ensureAsterismGameOverlay();
+        this._clearThreeGroup(this.asterismGamePendingGroup);
+        this.asterismGameState.selectedStarKey = starHit?.asterismKey || null;
+
+        if (!starHit) return;
+        const pos = this.sftw.raDecToVector3(starHit.ra, starHit.dec, this.sftw.settings.sphereRadius - 0.7);
+        this._drawAsterismGameMarker(pos, 0x22c55e, 2.25, this.asterismGamePendingGroup);
+    }
+
+    _cloneAsterismSegments(segments = []) {
+        return Array.isArray(segments)
+            ? segments
+                .filter(seg => seg && seg.aKey && seg.bKey)
+                .map(seg => ({ aKey: seg.aKey, bKey: seg.bKey }))
+            : [];
+    }
+
+    _isAsterismTargetSolved(targetId = null) {
+        const key = String(targetId || this.asterismGameState?.targetId || '').trim();
+        if (!key) return false;
+        return !!this.asterismGameState?.solvedTargetIds?.has?.(key);
+    }
+
+    _commitCurrentAsterismAsSolved(targetId = null) {
+        const key = String(targetId || this.asterismGameState?.targetId || '').trim();
+        if (!key) return false;
+
+        const solvedSegments = this._cloneAsterismSegments(this.asterismGameState?.userSegments || []);
+        if (!solvedSegments.length) return false;
+
+        this.asterismGameState.solvedSegmentsByTarget.set(key, solvedSegments);
+        this.asterismGameState.solvedTargetIds.add(key);
+        return true;
+    }
+
+    _drawSolvedAsterismGameLine(p1, p2, group = null) {
+        const host = group || this.asterismGameSolvedGroup;
+        if (!host) return;
+
+        // Camada externa: halo suave, levemente mais afastado da esfera.
+        this._drawAsterismGameLine(p1.clone().multiplyScalar(1.00055), p2.clone().multiplyScalar(1.00055), 0x86efac, 0.34, host);
+        // Camada intermediária: verde vivo para dar presença visual no céu.
+        this._drawAsterismGameLine(p1.clone().multiplyScalar(1.0003), p2.clone().multiplyScalar(1.0003), 0x22c55e, 0.92, host);
+        // Núcleo: linha principal mais escura para leitura do traçado.
+        this._drawAsterismGameLine(p1, p2, 0x15803d, 1.0, host);
+    }
+
+    _rebuildSolvedAsterismGameLines() {
+        this._ensureAsterismGameOverlay();
+        this._clearThreeGroup(this.asterismGameSolvedGroup);
+
+        const entries = this.asterismGameState?.solvedSegmentsByTarget?.entries?.();
+        if (!entries) return;
+
+        const solvedVertexKeys = new Set();
+
+        for (const [, segments] of entries) {
+            for (const seg of segments || []) {
+                const a = this.asterismGameState.starMap.get(seg.aKey);
+                const b = this.asterismGameState.starMap.get(seg.bKey);
+                const sa = a?.star || a || null;
+                const sb = b?.star || b || null;
+                if (!sa || !sb) continue;
+
+                const p1 = this.sftw.raDecToVector3(sa.ra, sa.dec, this.sftw.settings.sphereRadius - 0.72);
+                const p2 = this.sftw.raDecToVector3(sb.ra, sb.dec, this.sftw.settings.sphereRadius - 0.72);
+                this._drawSolvedAsterismGameLine(p1, p2, this.asterismGameSolvedGroup);
+
+                solvedVertexKeys.add(seg.aKey);
+                solvedVertexKeys.add(seg.bKey);
+            }
+        }
+
+        for (const key of solvedVertexKeys) {
+            const item = this.asterismGameState.starMap.get(key);
+            const star = item?.star || item || null;
+            if (!star) continue;
+
+            const pos = this.sftw.raDecToVector3(star.ra, star.dec, this.sftw.settings.sphereRadius - 0.68);
+            this._drawAsterismGameMarker(pos, 0x14532d, 1.25, this.asterismGameSolvedGroup);
+            this._drawAsterismGameMarker(pos, 0x4ade80, 1.95, this.asterismGameSolvedGroup);
+        }
+    }
+
+    _rebuildAsterismGameUserLines() {
+        this._ensureAsterismGameOverlay();
+        this._clearThreeGroup(this.asterismGameUserGroup);
+
+        const isSolved = !!this.asterismGameState.isSolvedVisual;
+        const lineColor = isSolved ? 0x22c55e : 0x00e5ff;
+        const lineOpacity = isSolved ? 1.0 : 0.98;
+        const haloColor = isSolved ? 0x86efac : 0x67e8f9;
+        const haloOpacity = isSolved ? 0.28 : 0.18;
+
+        for (const seg of this.asterismGameState.userSegments) {
+            const a = this.asterismGameState.starMap.get(seg.aKey);
+            const b = this.asterismGameState.starMap.get(seg.bKey);
+            const sa = a?.star || a || null;
+            const sb = b?.star || b || null;
+            if (!sa || !sb) continue;
+
+            const p1 = this.sftw.raDecToVector3(sa.ra, sa.dec, this.sftw.settings.sphereRadius - 0.7);
+            const p2 = this.sftw.raDecToVector3(sb.ra, sb.dec, this.sftw.settings.sphereRadius - 0.7);
+            this._drawAsterismGameLine(p1.clone().multiplyScalar(1.00025), p2.clone().multiplyScalar(1.00025), haloColor, haloOpacity, this.asterismGameUserGroup);
+            this._drawAsterismGameLine(p1, p2, lineColor, lineOpacity, this.asterismGameUserGroup);
+        }
+    }
+
+    clearAsterismGameVisuals() {
+        this.asterismGameState = {
+            targetId: null,
+            selectedStarKey: null,
+            userSegments: [],
+            solvedSegmentsByTarget: new Map(),
+            solvedTargetIds: new Set(),
+            allowedStarKeys: new Set(),
+            starMap: new Map(),
+            isSolvedVisual: false,
+            lastSubmissionResult: null
+        };
+        this._clearThreeGroup(this.asterismGameTargetGroup);
+        this._clearThreeGroup(this.asterismGameSolvedGroup);
+        this._clearThreeGroup(this.asterismGameUserGroup);
+        this._clearThreeGroup(this.asterismGamePendingGroup);
+        return true;
+    }
+
+    syncAsterismGameVisuals(state = null) {
+        const payload = this._getCurrentAsterismGameTargetData();
+        if (!payload) {
+            this.clearAsterismGameVisuals();
+            return false;
+        }
+
+        const { targetId, asterism } = payload;
+        this._ensureAsterismGameOverlay();
+
+        if (this.asterismGameState.targetId !== targetId) {
+            const previousSegments = Array.isArray(this.asterismGameState.userSegments)
+                ? this.asterismGameState.userSegments.slice()
+                : [];
+            const previousSolvedSegmentsByTarget = new Map(this.asterismGameState?.solvedSegmentsByTarget || []);
+            const previousSolvedTargetIds = new Set(this.asterismGameState?.solvedTargetIds || []);
+
+            this.clearAsterismGameVisuals();
+            this.asterismGameState.targetId = targetId;
+            this.asterismGameState.solvedSegmentsByTarget = previousSolvedSegmentsByTarget;
+            this.asterismGameState.solvedTargetIds = previousSolvedTargetIds;
+
+            const starMap = new Map();
+
+            // Todas as estrelas ficam clicáveis no jogo.
+            // O starMap serve apenas para reconstrução visual dos segmentos já montados.
+            for (const star of (this.sftw?.stars || [])) {
+                if (!star) continue;
+                const key = this._makeAsterismResolvedStarKey(star);
+                starMap.set(key, { star, localId: key, key });
+            }
+
+            this.asterismGameState.starMap = starMap;
+            this.asterismGameState.allowedStarKeys = new Set(starMap.keys());
+            this.asterismGameState.userSegments = previousSegments.filter(
+                (seg) => starMap.has(seg?.aKey) && starMap.has(seg?.bKey)
+            );
+
+            for (const [solvedId, solvedSegments] of Array.from(this.asterismGameState.solvedSegmentsByTarget.entries())) {
+                const filtered = this._cloneAsterismSegments(solvedSegments).filter(
+                    (seg) => starMap.has(seg?.aKey) && starMap.has(seg?.bKey)
+                );
+                if (filtered.length) {
+                    this.asterismGameState.solvedSegmentsByTarget.set(solvedId, filtered);
+                } else {
+                    this.asterismGameState.solvedSegmentsByTarget.delete(solvedId);
+                    this.asterismGameState.solvedTargetIds.delete(solvedId);
+                }
+            }
+
+            if (this._isAsterismTargetSolved(targetId)) {
+                this.asterismGameState.userSegments = [];
+                this.asterismGameState.isSolvedVisual = false;
+            }
+
+            this._rebuildSolvedAsterismGameLines();
+            this._rebuildAsterismGameUserLines();
+            this._setPendingAsterismGameStar(null);
+        }
+
+        return true;
+    }
+
+    _processAsterismGameClick(event) {
+        const payload = this._getCurrentAsterismGameTargetData();
+        if (!payload) return false;
+
+        this.syncAsterismGameVisuals();
+
+        if (this._isAsterismTargetSolved(payload.targetId)) {
+            this.sftw?.ui?.showMessage?.('Esse asterismo já foi concluído e ficou salvo no céu.', 'info', 1300, {
+                replaceKey: 'asterism-play',
+                replaceActive: true,
+                skipQueue: true
+            });
+            return true;
+        }
+
+        const hit = this._pickStarUnderPointer?.(event);
+        if (!hit) {
+            this.sftw?.ui?.showMessage?.('Clique em uma estrela para montar um par.', 'warning', 1200, {
+                replaceKey: 'asterism-play',
+                replaceActive: true,
+                skipQueue: true
+            });
+            return true;
+        }
+
+        const hitKey = this._makeAsterismResolvedStarKey(hit);
+        const prevKey = this.asterismGameState.selectedStarKey;
+
+        if (!prevKey) {
+            this._setPendingAsterismGameStar({
+                ...hit,
+                asterismKey: hitKey
+            });
+            this.sftw?.ui?.showMessage?.('Primeiro ponto marcado. Escolha o segundo ponto do segmento.', 'info', 1100, {
+                replaceKey: 'asterism-play',
+                replaceActive: true,
+                skipQueue: true
+            });
+            return true;
+        }
+
+        if (prevKey === hitKey) {
+            this._setPendingAsterismGameStar(null);
+            this.sftw?.ui?.showMessage?.('Par cancelado.', 'info', 900, {
+                replaceKey: 'asterism-play',
+                replaceActive: true,
+                skipQueue: true
+            });
+            return true;
+        }
+
+        const canonical = [prevKey, hitKey].sort().join('::');
+        const exists = this.asterismGameState.userSegments.some(
+            seg => [seg.aKey, seg.bKey].sort().join('::') === canonical
+        );
+
+        if (exists) {
+            this._setPendingAsterismGameStar(null);
+            this.sftw?.ui?.showMessage?.('Esse segmento já foi marcado.', 'warning', 1000, {
+                replaceKey: 'asterism-play',
+                replaceActive: true,
+                skipQueue: true
+            });
+            return true;
+        }
+
+        this.asterismGameState.userSegments.push({
+            aKey: prevKey,
+            bKey: hitKey
+        });
+        this.asterismGameState.isSolvedVisual = false;
+        this.asterismGameState.lastSubmissionResult = null;
+
+        this._rebuildAsterismGameUserLines();
+        this._setPendingAsterismGameStar(null);
+
+        const count = this.asterismGameState.userSegments.length;
+        this.sftw?.ui?.showMessage?.(`Segmento ${count} criado.`, 'success', 900, {
+            replaceKey: 'asterism-play',
+            replaceActive: true,
+            skipQueue: true
+        });
+
+        return true;
+    }
+
+    focusCurrentAsterismGameTarget() {
+        const payload = this._getCurrentAsterismGameTargetData();
+        if (!payload) return false;
+        return this.focusOnAsterism(payload.targetId);
+    }
+
+    getAsterismGameUserSegments() {
+        return Array.isArray(this.asterismGameState?.userSegments)
+            ? this.asterismGameState.userSegments.map((seg) => ({ aKey: seg?.aKey, bKey: seg?.bKey }))
+            : [];
+    }
+
+    _resetAsterismSolvedVisualState() {
+        this.asterismGameState.isSolvedVisual = false;
+        this.asterismGameState.lastSubmissionResult = null;
+    }
+
+    undoLastAsterismGameSegment() {
+        this.syncAsterismGameVisuals();
+
+        const hasPending = !!this.asterismGameState?.selectedStarKey;
+        const segments = this.asterismGameState?.userSegments;
+
+        if (hasPending) {
+            this._setPendingAsterismGameStar(null);
+            this._resetAsterismSolvedVisualState();
+            this._rebuildAsterismGameUserLines();
+            return true;
+        }
+
+        if (!Array.isArray(segments) || !segments.length) {
+            return false;
+        }
+
+        segments.pop();
+        this._setPendingAsterismGameStar(null);
+        this._resetAsterismSolvedVisualState();
+        this._rebuildAsterismGameUserLines();
+        return true;
+    }
+
+    clearCurrentAsterismGameSegments() {
+        this.syncAsterismGameVisuals();
+
+        const hadPending = !!this.asterismGameState?.selectedStarKey;
+        const hadSegments = Array.isArray(this.asterismGameState?.userSegments) && this.asterismGameState.userSegments.length > 0;
+
+        if (!hadPending && !hadSegments) {
+            return false;
+        }
+
+        this.asterismGameState.userSegments = [];
+        this._setPendingAsterismGameStar(null);
+        this._resetAsterismSolvedVisualState();
+        this._rebuildAsterismGameUserLines();
+        return true;
+    }
+
+    submitCurrentAsterismGameSegments() {
+        this.syncAsterismGameVisuals();
+
+        const segments = this.getAsterismGameUserSegments();
+        if (!segments.length) {
+            return null;
+        }
+
+        if (typeof this.sftw?.submitAsterismSegments !== 'function') {
+            return null;
+        }
+
+        const result = this.sftw.submitAsterismSegments(segments);
+        if (!result || result.ok === false) {
+            return result || null;
+        }
+
+        this.asterismGameState.lastSubmissionResult = result;
+        this.asterismGameState.isSolvedVisual = !!(result?.isCorrect || result?.result?.isCorrect || result?.result?.isPerfect || result?.isPerfect);
+
+        if (this.asterismGameState.isSolvedVisual) {
+            this._commitCurrentAsterismAsSolved(this.asterismGameState.targetId);
+            this.asterismGameState.userSegments = [];
+            this.asterismGameState.isSolvedVisual = false;
+            this._rebuildSolvedAsterismGameLines();
+        }
+
+        this._setPendingAsterismGameStar(null);
+        this._rebuildAsterismGameUserLines();
+
+        return result;
+    }
+
+
     cleanup() {
         this.clearGeodesicBoundaries();
         this.clearConstellationAreas();
@@ -3450,16 +4331,17 @@ clearGeodesicBoundaries() {
         this.clearStars();
         this.clearGrid();
         this.clearOriginalSegments();
+        this.clearAsterismLayer();
         
         this.hideConstellationInfo();
         
         const infoStyles = document.getElementById('info-container-styles');
         if (infoStyles) infoStyles.remove();
         
-        const canvas = this.sftw.sceneManager?.renderer?.domElement;
+        const canvas = this._getCanvasElement();
         if (canvas) {
-            canvas.removeEventListener('mousemove', this.boundMouseMove);
-            canvas.removeEventListener('click', this.boundMouseClick);
+            this._removePrimaryInteractionBindings(canvas);
+            this._removeMessierInteractionBindings(canvas);
             canvas.style.cursor = 'default';
         }
 
@@ -3474,22 +4356,7 @@ clearGeodesicBoundaries() {
         this.currentInfoStar = null;
         this.currentInfoType = null;
 
-        this.messierGame = {
-            active: false,
-            finished: false,
-            targetId: null,
-            manualTargetId: null,
-            randomOrder: false,
-            autoAdvance: true,
-            showErrorHint: true,
-            toleranceDeg: 1.2,
-            totalErrors: 0,
-            errorsById: {},
-            discovered: new Set(),
-            orderedIds: [],
-            lastAngleErrorDeg: null,
-            startedAt: 0
-        };
+        this.messierGame = this._createDefaultMessierGameState();
 
         // Estudo de estrelas (filtros aplicados pela aba "Estrelas")
         this.starStudyFilter = {
@@ -3527,14 +4394,73 @@ if (typeof window !== 'undefined') {
         sftwInstance.toggleStars = () => visualization.toggleStars();
         sftwInstance.toggleMessier = () => visualization.toggleMessier();
         sftwInstance.setMessierVisible = (v) => visualization.setMessierVisible(v);
+        sftwInstance.setAsterismsVisible = (v) => visualization.setAsterismsVisible(v);
+        sftwInstance.setAsterismLabelsVisible = (v) => visualization.setAsterismLabelsVisible(v);
         sftwInstance.focusOnMessier = (id) => visualization.focusOnMessier(id);
         sftwInstance.syncMessierGameVisuals = (state) => visualization.syncMessierGameVisuals(state);
-        sftwInstance.startMessierGame = (opts) => visualization.startMessierGame(opts);
-        sftwInstance.stopMessierGame = (opts) => visualization.stopMessierGame(opts);
-        sftwInstance.getMessierGameState = () => visualization.getMessierGameState();
-        sftwInstance.setMessierGameOptions = (opts) => visualization.setMessierGameOptions(opts);
-        sftwInstance.setMessierGameTarget = (id) => visualization.setMessierGameTarget(id);
-        sftwInstance.isMessierGameActive = () => visualization.isMessierGameActive();
+
+        // Wrappers defensivos: preferem o controller canônico do Messier quando ele existir.
+        sftwInstance.startMessierGame = (opts) => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.startGame === 'function') {
+                return sftwInstance.messierGameController.startGame(opts);
+            }
+            return visualization.startMessierGame(opts);
+        };
+        sftwInstance.stopMessierGame = (opts) => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.stopGame === 'function') {
+                return sftwInstance.messierGameController.stopGame(opts);
+            }
+            return visualization.stopMessierGame(opts);
+        };
+        sftwInstance.endMessierGame = (opts) => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.endGame === 'function') {
+                return sftwInstance.messierGameController.endGame(opts);
+            }
+            return visualization.stopMessierGame(opts);
+        };
+        sftwInstance.restartMessierGame = (opts) => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.restartGame === 'function') {
+                return sftwInstance.messierGameController.restartGame(opts);
+            }
+            visualization.stopMessierGame({ restoreVisible: false });
+            return visualization.startMessierGame(opts);
+        };
+        sftwInstance.getMessierGameState = () => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.getGameState === 'function') {
+                return sftwInstance.messierGameController.getGameState();
+            }
+            return visualization.getMessierGameState();
+        };
+        sftwInstance.setMessierGameOptions = (opts) => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.applyConfiguration === 'function') {
+                return sftwInstance.messierGameController.applyConfiguration(opts);
+            }
+            return visualization.setMessierGameOptions(opts);
+        };
+        sftwInstance.setMessierGameTarget = (id) => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.setManualTarget === 'function') {
+                return sftwInstance.messierGameController.setManualTarget(id);
+            }
+            return visualization.setMessierGameTarget(id);
+        };
+        sftwInstance.setMessierManualTarget = (id) => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.setManualTarget === 'function') {
+                return sftwInstance.messierGameController.setManualTarget(id);
+            }
+            return visualization.setMessierGameTarget(id);
+        };
+        sftwInstance.isMessierGameActive = () => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.isActive === 'function') {
+                return !!sftwInstance.messierGameController.isActive();
+            }
+            return visualization.isMessierGameActive();
+        };
+        sftwInstance.submitMessierAngleError = (deg) => {
+            if (sftwInstance.messierGameController && typeof sftwInstance.messierGameController.submitAngleError === 'function') {
+                return sftwInstance.messierGameController.submitAngleError(deg);
+            }
+            return false;
+        };
         sftwInstance.toggleSegments = () => visualization.toggleSegments();
         
         sftwInstance.hideAllConstellations = () => visualization.hideAllConstellations();

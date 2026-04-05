@@ -1,17 +1,21 @@
 // Sftw1_Games.js
 // Núcleo central de lógica de jogos do planetário
-// Versão v3 — reforço de compatibilidade com o fluxo real do jogo principal
+// Versão v4.3 — refinamento conservador do jogo 1
 //
-// Objetivo:
-// - centralizar a lógica dos jogos
-// - manter compatibilidade com a API antiga
-// - reduzir diferenças práticas em relação ao Sftw1_Game.js legado
-// - NÃO cuidar de UI
-// - NÃO cuidar de rAenderização 3D
+// Objetivo desta etapa:
+// - corrigir o fluxo real do jogo principal das constelações
+// - manter compatibilidade com a API já usada pela UI atual
+// - preservar NeighborGame / aliases existentes
+// - NÃO mexer em UI nem em renderização 3D
 
 class Sftw1_ConstellationGame {
     constructor(sftwInstance) {
         this.sftw = sftwInstance;
+        this._lastStartOptions = {
+            showBoundaries: true,
+            showLabels: false,
+            useAdjacency: true
+        };
 
         this.state = {
             active: false,
@@ -23,7 +27,7 @@ class Sftw1_ConstellationGame {
             currentConstellation: null,
             discovered: new Set(),
             allowedTargets: new Set(),
-            useAdjacency: false,
+            useAdjacency: true,
             attempts: {},
             finished: false,
             visualOptions: {
@@ -79,6 +83,32 @@ class Sftw1_ConstellationGame {
         return '';
     }
 
+    _getDisplayName(abbr) {
+        const c = this._getConstellationData(abbr);
+        return c?.name || c?.fullName || c?.portugueseName || abbr || '—';
+    }
+
+    _normalizeStartOptions(options = {}) {
+        const normalized = {
+            showBoundaries: options?.showBoundaries !== undefined ? !!options.showBoundaries : true,
+            showLabels: options?.showLabels !== undefined ? !!options.showLabels : false,
+            useAdjacency: options?.useAdjacency !== undefined ? !!options.useAdjacency : true
+        };
+
+        this._lastStartOptions = { ...normalized };
+        return normalized;
+    }
+
+    _attachClickHandler() {
+        this.sftw.callbacks = this.sftw.callbacks || {};
+        this.sftw.callbacks.onConstellationClick = (abbr) => this.handleConstellationClick(abbr);
+    }
+
+    _detachClickHandler() {
+        if (this.sftw.callbacks) {
+            this.sftw.callbacks.onConstellationClick = null;
+        }
+    }
 
     showSelection() {
         if (!this.sftw.constellations || this.sftw.constellations.length === 0) {
@@ -97,7 +127,7 @@ class Sftw1_ConstellationGame {
         const startAbbr = this._resolveConstellationAbbr(constellationAbbr);
         if (!startAbbr) {
             console.error('❌ startGame: constelação inválida');
-            return;
+            return null;
         }
 
         if (this.state.active) {
@@ -107,24 +137,25 @@ class Sftw1_ConstellationGame {
 
         this.resetState();
 
+        const startOptions = this._normalizeStartOptions(options);
+
         this.state.active = true;
         this.state.finished = false;
         this.state.startConstellation = startAbbr;
         this.state.currentConstellation = startAbbr;
         this.state.score = 0;
+        this.state.useAdjacency = !!startOptions.useAdjacency;
         this.state.visualOptions = {
-            showBoundaries: options?.showBoundaries !== undefined ? !!options.showBoundaries : true,
-            showLabels: options?.showLabels !== undefined ? !!options.showLabels : false
+            showBoundaries: !!startOptions.showBoundaries,
+            showLabels: !!startOptions.showLabels
         };
 
-        this.sftw.callbacks = this.sftw.callbacks || {};
-        this.sftw.callbacks.onConstellationClick = (abbr) => this.handleConstellationClick(abbr);
+        this._attachClickHandler();
 
         if (typeof this.sftw.startGameMode === 'function') {
             this.sftw.startGameMode(startAbbr, this.state.visualOptions);
         }
 
-        // Descobrir constelação inicial
         this.discoverConstellation(startAbbr);
 
         if (this.state.useAdjacency) {
@@ -147,62 +178,58 @@ class Sftw1_ConstellationGame {
 
     endGame() {
         if (!this.state.active) {
-            return this.buildResult()
+            return this.buildResult();
         }
 
-        this.stopTimer()
-        this.state.active = false
-        this.state.finished = true
+        this.stopTimer();
+        this.state.active = false;
+        this.state.finished = true;
 
         if (typeof this.sftw.endGameMode === 'function') {
-            this.sftw.endGameMode()
+            this.sftw.endGameMode();
         }
 
-        if (this.sftw.callbacks) {
-            this.sftw.callbacks.onConstellationClick = null
-        }
+        this._detachClickHandler();
 
-        const result = this.buildResult()
+        const result = this.buildResult();
 
-        this.publishGameState()
-        this.sftw.triggerCallback?.('onGameEnd', result)
+        this.publishGameState();
+        this.sftw.triggerCallback?.('onGameEnd', result);
 
-        console.log('🏁 Games/Constellation: jogo finalizado', result)
-        return result
+        console.log('🏁 Games/Constellation: jogo finalizado', result);
+        return result;
     }
 
     cancelGame() {
-        this.stopTimer()
+        this.stopTimer();
 
         if (typeof this.sftw.endGameMode === 'function') {
-            this.sftw.endGameMode()
+            this.sftw.endGameMode();
         }
 
-        if (this.sftw.callbacks) {
-            this.sftw.callbacks.onConstellationClick = null
-        }
+        this._detachClickHandler();
+        this.resetState();
+        this.publishGameState();
 
-        this.resetState()
-        this.publishGameState()
-
-        return this.getGameState()
+        return this.getGameState();
     }
 
     restartGame() {
-        if (!this.state.startConstellation) return null
-        const start = this.state.startConstellation
-        this.cancelGame()
-        return this.startGame(start)
+        if (!this.state.startConstellation) return null;
+        const start = this.state.startConstellation;
+        const restartOptions = { ...this._lastStartOptions };
+        this.cancelGame();
+        return this.startGame(start, restartOptions);
     }
 
     returnToMainMenu() {
-        return this.endGame()
+        return this.endGame();
     }
 
     discoverConstellation(abbr) {
         const key = this._resolveConstellationAbbr(abbr);
-        if (!key) return;
-        if (this.state.discovered.has(key)) return;
+        if (!key) return null;
+        if (this.state.discovered.has(key)) return null;
 
         this.state.discovered.add(key);
         this.state.allowedTargets.delete(key);
@@ -215,7 +242,6 @@ class Sftw1_ConstellationGame {
             this.sftw.setGameRevealedSet(this.state.discovered);
         }
 
-        // A lógica do jogo dispara a revelação visual da constelação descoberta.
         if (typeof this.sftw.revealConstellation === 'function') {
             this.sftw.revealConstellation(key, {
                 fog: true,
@@ -238,6 +264,7 @@ class Sftw1_ConstellationGame {
         this.sftw.triggerCallback?.('onConstellationDiscovered', { abbr: key, attempts, points: gained });
 
         console.log(`✅ Games/Constellation: descoberta ${key} (+${gained})`);
+        return { abbr: key, attempts, points: gained };
     }
 
     expandAllowedTargets(fromAbbr) {
@@ -256,9 +283,23 @@ class Sftw1_ConstellationGame {
     }
 
     checkCompletion() {
-        if (this.state.useAdjacency && this.state.allowedTargets.size === 0) {
-            this.endGame()
+        if (!this.state.active) return false;
+
+        if (this.state.useAdjacency) {
+            if (this.state.allowedTargets.size === 0) {
+                this.endGame();
+                return true;
+            }
+            return false;
         }
+
+        const total = this.sftw?.constellations?.length || 0;
+        if (total > 0 && this.state.discovered.size >= total) {
+            this.endGame();
+            return true;
+        }
+
+        return false;
     }
 
     handleConstellationClick(targetAbbr) {
@@ -322,7 +363,9 @@ class Sftw1_ConstellationGame {
                 targetAbbr: target,
                 input: inputText,
                 attempts: Number(this.state.attempts?.[target] || 1),
-                elapsedTime: this.state.elapsedTime
+                elapsedTime: this.state.elapsedTime,
+                score: this.state.score,
+                discoveredCount: this.state.discovered.size
             };
 
             this.publishGameState();
@@ -340,7 +383,8 @@ class Sftw1_ConstellationGame {
             targetAbbr: target,
             input: inputText,
             attempts: wrong?.attempts || 1,
-            elapsedTime: this.state.elapsedTime
+            elapsedTime: this.state.elapsedTime,
+            score: this.state.score
         };
 
         this.sftw.triggerCallback?.('onWrongAnswer', target, inputText);
@@ -376,13 +420,15 @@ class Sftw1_ConstellationGame {
         }
 
         const wrong = this.registerAttempt(this.state.currentConstellation || null, inputText);
-        const payload = { correct: false, attempts: wrong?.attempts || 1 };
-        this.sftw.triggerCallback?.('onWrongAnswer', this.state.currentConstellation || null, inputText);
-        this.sftw.triggerCallback?.('onWrongAnswer', {
+        const payload = {
+            correct: false,
+            attempts: wrong?.attempts || 1,
             targetAbbr: this.state.currentConstellation || null,
             input: inputText,
-            attempts: wrong?.attempts || 1
-        });
+            score: this.state.score
+        };
+        this.sftw.triggerCallback?.('onWrongAnswer', this.state.currentConstellation || null, inputText);
+        this.sftw.triggerCallback?.('onWrongAnswer', payload);
         return payload;
     }
 
@@ -414,11 +460,11 @@ class Sftw1_ConstellationGame {
             .trim()
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
+            .toLowerCase();
     }
 
     registerAttempt(targetAbbr, input) {
-        const key = this._resolveConstellationAbbr(targetAbbr || this.state.currentConstellation || 'unknown');
+        const key = this._resolveConstellationAbbr(targetAbbr || this.state.currentConstellation || 'unknown') || 'unknown';
         if (!this.state.attempts[key]) this.state.attempts[key] = 0;
         this.state.attempts[key]++;
 
@@ -430,77 +476,133 @@ class Sftw1_ConstellationGame {
         return {
             targetAbbr: key,
             input,
-            attempts: this.state.attempts[key]
+            attempts: this.state.attempts[key],
+            score: this.state.score
         };
     }
 
+    getAnswerKey() {
+        const discovered = Array.from(this.state.discovered)
+            .sort((a, b) => this._getDisplayName(a).localeCompare(this._getDisplayName(b), 'pt-BR'));
+
+        const all = (this.sftw.constellations || [])
+            .map((c) => c.abbreviation)
+            .filter(Boolean);
+
+        const missing = all
+            .filter((abbr) => !this.state.discovered.has(abbr))
+            .sort((a, b) => this._getDisplayName(a).localeCompare(this._getDisplayName(b), 'pt-BR'));
+
+        return {
+            active: !!this.state.active,
+            finished: !!this.state.finished,
+            startConstellation: this.state.startConstellation,
+            currentConstellation: this.state.currentConstellation,
+            discovered,
+            missing,
+            discoveredCount: discovered.length,
+            missingCount: missing.length,
+            totalConstellations: all.length,
+            useAdjacency: !!this.state.useAdjacency,
+            elapsedTime: this.state.elapsedTime,
+            score: this.state.score
+        };
+    }
+
+    showAnswerKey() {
+        const key = this.getAnswerKey();
+        this.sftw.triggerCallback?.('onConstellationAnswerKey', key);
+        return key;
+    }
+
     publishGameState() {
-        const gs = this.sftw.gameState || {}
+        const gs = this.sftw.gameState || {};
+        const totalConstellations = this.sftw.constellations ? this.sftw.constellations.length : 88;
+
         gs.status = this.state.active
             ? (this.state.finished ? 'completed' : 'playing')
-            : (this.state.finished ? 'completed' : 'idle')
-        gs.isGameActive = !!this.state.active
-        gs.selectedConstellation = this.state.currentConstellation || this.state.startConstellation || null
-        gs.startTime = this.state.startTime || null
-        gs.elapsedTime = this.state.elapsedTime || 0
-        gs.score = this.state.score || 0
-        gs.totalConstellations = gs.totalConstellations || (this.sftw.constellations ? this.sftw.constellations.length : 88)
+            : (this.state.finished ? 'completed' : 'idle');
+        gs.active = !!this.state.active;
+        gs.finished = !!this.state.finished;
+        gs.isGameActive = !!this.state.active;
+        gs.selectedConstellation = this.state.currentConstellation || this.state.startConstellation || null;
+        gs.startConstellation = this.state.startConstellation || null;
+        gs.currentConstellation = this.state.currentConstellation || null;
+        gs.startTime = this.state.startTime || null;
+        gs.elapsedTime = this.state.elapsedTime || 0;
+        gs.score = this.state.score || 0;
+        gs.totalConstellations = totalConstellations;
+        gs.useAdjacency = !!this.state.useAdjacency;
+        gs.allowedTargets = Array.from(this.state.allowedTargets);
+        gs.attempts = { ...this.state.attempts };
 
         if (!gs.discoveredConstellations || !(gs.discoveredConstellations instanceof Set)) {
-            gs.discoveredConstellations = new Set()
+            gs.discoveredConstellations = new Set();
         }
 
-        gs.discoveredConstellations.clear()
+        gs.discoveredConstellations.clear();
         for (const a of this.state.discovered) {
-            gs.discoveredConstellations.add(a)
+            gs.discoveredConstellations.add(a);
         }
 
-        gs.discoveredCount = gs.discoveredConstellations.size
-        this.sftw.gameState = gs
+        gs.discoveredCount = gs.discoveredConstellations.size;
+        gs.discovered = Array.from(gs.discoveredConstellations);
+        this.sftw.gameState = gs;
 
-        this.sftw.triggerCallback?.('onGameStateChange', gs)
+        this.sftw.triggerCallback?.('onGameStateChange', gs);
     }
 
     getGameState() {
         return {
             active: this.state.active,
             finished: this.state.finished,
+            status: this.state.active ? 'playing' : (this.state.finished ? 'completed' : 'idle'),
             elapsedTime: this.state.elapsedTime,
             score: this.state.score,
             startConstellation: this.state.startConstellation,
             currentConstellation: this.state.currentConstellation,
             discoveredCount: this.state.discovered.size,
+            totalConstellations: this.sftw?.constellations?.length || 88,
             discovered: Array.from(this.state.discovered),
             allowedTargets: Array.from(this.state.allowedTargets),
             useAdjacency: this.state.useAdjacency,
-            attempts: { ...this.state.attempts }
-        }
+            attempts: { ...this.state.attempts },
+            visualOptions: { ...this.state.visualOptions }
+        };
     }
 
     buildResult() {
+        const discovered = Array.from(this.state.discovered);
         return {
             startConstellation: this.state.startConstellation,
-            discovered: Array.from(this.state.discovered),
+            currentConstellation: this.state.currentConstellation,
+            discovered,
+            discoveredCount: discovered.length,
+            constellations: discovered.length,
+            totalConstellations: this.sftw?.constellations?.length || 88,
             time: this.state.elapsedTime,
-            attempts: this.state.attempts,
-            score: this.state.score
-        }
+            elapsedTime: this.state.elapsedTime,
+            attempts: { ...this.state.attempts },
+            score: this.state.score,
+            useAdjacency: !!this.state.useAdjacency
+        };
     }
 
     startTimer() {
-        this.state.startTime = performance.now()
-        this.state.elapsedTime = 0
+        this.stopTimer();
+        this.state.startTime = performance.now();
+        this.state.elapsedTime = 0;
 
         this.state.timerInterval = setInterval(() => {
-            this.state.elapsedTime = Math.floor((performance.now() - this.state.startTime) / 1000)
-            this.publishGameState()
-        }, 1000)
+            this.state.elapsedTime = Math.floor((performance.now() - this.state.startTime) / 1000);
+            this.publishGameState();
+        }, 1000);
     }
 
     stopTimer() {
         if (this.state.timerInterval) {
-            clearInterval(this.state.timerInterval)
-            this.state.timerInterval = null
+            clearInterval(this.state.timerInterval);
+            this.state.timerInterval = null;
         }
     }
 
@@ -508,6 +610,7 @@ class Sftw1_ConstellationGame {
         this.stopTimer();
         this.state.active = false;
         this.state.finished = false;
+        this.state.startTime = null;
         this.state.startConstellation = null;
         this.state.currentConstellation = null;
         this.state.discovered.clear();
@@ -515,7 +618,11 @@ class Sftw1_ConstellationGame {
         this.state.attempts = {};
         this.state.elapsedTime = 0;
         this.state.score = 0;
-        // preserva useAdjacency
+        this.state.useAdjacency = this._lastStartOptions?.useAdjacency !== undefined ? !!this._lastStartOptions.useAdjacency : true;
+        this.state.visualOptions = {
+            showBoundaries: this._lastStartOptions?.showBoundaries !== undefined ? !!this._lastStartOptions.showBoundaries : true,
+            showLabels: this._lastStartOptions?.showLabels !== undefined ? !!this._lastStartOptions.showLabels : false
+        };
 
         if (typeof this.sftw.setGameRevealedSet === 'function') {
             this.sftw.setGameRevealedSet(this.state.discovered);
@@ -525,9 +632,9 @@ class Sftw1_ConstellationGame {
 
 class Sftw1_NeighborGameMode {
     constructor(sftwInstance) {
-        this.sftw = sftwInstance
-        this.state = this._createInitialState()
-        console.log('🧩 Sftw1_NeighborGameMode inicializado')
+        this.sftw = sftwInstance;
+        this.state = this._createInitialState();
+        console.log('🧩 Sftw1_NeighborGameMode inicializado');
     }
 
     _createInitialState() {
@@ -544,81 +651,81 @@ class Sftw1_NeighborGameMode {
             rounds: [],
             pendingTargets: [],
             usedTargets: new Set()
-        }
+        };
     }
 
     startGame(options = {}) {
-        if (this.state.active) return this.getGameState()
+        if (this.state.active) return this.getGameState();
 
-        const eligible = this._getEligibleConstellations()
+        const eligible = this._getEligibleConstellations();
         if (!eligible.length) {
-            throw new Error('NeighborGame: nenhuma constelação elegível encontrada.')
+            throw new Error('NeighborGame: nenhuma constelação elegível encontrada.');
         }
 
-        this.resetState()
+        this.resetState();
 
-        const shuffled = this._shuffle(eligible.slice())
-        let roundLimit = Number.isFinite(options.roundLimit) ? Math.floor(options.roundLimit) : shuffled.length
-        if (roundLimit < 1) roundLimit = 1
-        if (roundLimit > shuffled.length) roundLimit = shuffled.length
+        const shuffled = this._shuffle(eligible.slice());
+        let roundLimit = Number.isFinite(options.roundLimit) ? Math.floor(options.roundLimit) : shuffled.length;
+        if (roundLimit < 1) roundLimit = 1;
+        if (roundLimit > shuffled.length) roundLimit = shuffled.length;
 
-        this.state.pendingTargets = shuffled.slice(0, roundLimit)
-        this.state.active = true
-        this.state.finished = false
-        this.state.startTime = performance.now()
+        this.state.pendingTargets = shuffled.slice(0, roundLimit);
+        this.state.active = true;
+        this.state.finished = false;
+        this.state.startTime = performance.now();
 
-        this.startTimer()
-        this.nextRound()
+        this.startTimer();
+        this.nextRound();
 
-        this.publishGameState()
-        this.sftw.triggerCallback?.('onNeighborGameStart', this.getGameState())
-        return this.getGameState()
+        this.publishGameState();
+        this.sftw.triggerCallback?.('onNeighborGameStart', this.getGameState());
+        return this.getGameState();
     }
 
     endGame() {
         if (!this.state.active && !this.state.finished) {
-            return this.getFinalReport()
+            return this.getFinalReport();
         }
 
-        this.stopTimer()
-        this.state.active = false
-        this.state.finished = true
+        this.stopTimer();
+        this.state.active = false;
+        this.state.finished = true;
 
-        const report = this.getFinalReport()
-        this.publishGameState()
-        this.sftw.triggerCallback?.('onNeighborGameEnd', report)
-        return report
+        const report = this.getFinalReport();
+        this.publishGameState();
+        this.sftw.triggerCallback?.('onNeighborGameEnd', report);
+        return report;
     }
 
     cancelGame() {
-        this.stopTimer()
-        this.resetState()
-        this.publishGameState()
-        return this.getGameState()
+        this.stopTimer();
+        this.resetState();
+        this.publishGameState();
+        return this.getGameState();
     }
 
     restartGame(options = {}) {
-        this.cancelGame()
-        return this.startGame(options)
+        this.cancelGame();
+        return this.startGame(options);
     }
 
     returnToMainMenu() {
-        return this.endGame()
+        return this.endGame();
     }
 
     nextRound() {
-        if (!this.state.active) return null
+        if (!this.state.active) return null;
 
         if (!this.state.pendingTargets.length) {
-            return this.endGame()
+            return this.endGame();
         }
 
-        const target = this.state.pendingTargets.shift()
-        this.state.currentTarget = target
-        this.state.currentRoundIndex += 1
-        this.state.usedTargets.add(target)
+        const target = this.state.pendingTargets.shift();
+        this.state.currentTarget = target;
+        this.state.currentRoundIndex += 1;
+        this.state.usedTargets.add(target);
 
-        const correctNeighbors = this._getNeighbors(target)
+        const correctNeighbors = this._getNeighbors(target);
 
         const round = {
             index: this.state.currentRoundIndex,
@@ -633,51 +740,51 @@ class Sftw1_NeighborGameMode {
             scoreEarned: 0,
             maxScore: correctNeighbors.length,
             submittedAt: null
-        }
+        };
 
-        this.state.rounds.push(round)
-        this.state.maxScore += round.maxScore
+        this.state.rounds.push(round);
+        this.state.maxScore += round.maxScore;
 
-        this.publishGameState()
-        this.sftw.triggerCallback?.('onNeighborRoundStart', this.serializeRound(round))
+        this.publishGameState();
+        this.sftw.triggerCallback?.('onNeighborRoundStart', this.serializeRound(round));
 
-        return this.serializeRound(round)
+        return this.serializeRound(round);
     }
 
     submitAnswer(inputText) {
-        if (!this.state.active) return null
+        if (!this.state.active) return null;
 
-        const round = this.getCurrentRound()
-        if (!round) return null
+        const round = this.getCurrentRound();
+        if (!round) return null;
 
-        const parsed = this._parseAnswerList(inputText)
-        const result = this._evaluateRound(round, parsed)
+        const parsed = this._parseAnswerList(inputText);
+        const result = this._evaluateRound(round, parsed);
 
-        round.submittedRaw = parsed.original
-        round.submittedNormalized = parsed.normalized
-        round.matched = result.matched
-        round.missing = result.missing
-        round.invalid = result.invalid
-        round.scoreEarned = result.score
-        round.submittedAt = this.state.elapsedTime
+        round.submittedRaw = parsed.original;
+        round.submittedNormalized = parsed.normalized;
+        round.matched = result.matched;
+        round.missing = result.missing;
+        round.invalid = result.invalid;
+        round.scoreEarned = result.score;
+        round.submittedAt = this.state.elapsedTime;
 
-        this.state.score += round.scoreEarned
+        this.state.score += round.scoreEarned;
 
-        const payload = this.serializeRound(round)
+        const payload = this.serializeRound(round);
 
-        this.publishGameState()
-        this.sftw.triggerCallback?.('onNeighborRoundSubmitted', payload)
+        this.publishGameState();
+        this.sftw.triggerCallback?.('onNeighborRoundSubmitted', payload);
 
-        return payload
+        return payload;
     }
 
     getCurrentRound() {
-        if (this.state.currentRoundIndex < 0) return null
-        return this.state.rounds[this.state.currentRoundIndex] || null
+        if (this.state.currentRoundIndex < 0) return null;
+        return this.state.rounds[this.state.currentRoundIndex] || null;
     }
 
     getGameState() {
-        const currentRound = this.getCurrentRound()
+        const currentRound = this.getCurrentRound();
 
         return {
             active: this.state.active,
@@ -694,7 +801,7 @@ class Sftw1_NeighborGameMode {
             roundsCompleted: this.state.rounds.filter((r) => r.submittedAt !== null).length,
             totalRounds: this.state.rounds.length + this.state.pendingTargets.length,
             pendingTargetsCount: this.state.pendingTargets.length
-        }
+        };
     }
 
     getFinalReport() {
@@ -706,136 +813,136 @@ class Sftw1_NeighborGameMode {
             accuracy: this.state.maxScore > 0 ? (this.state.score / this.state.maxScore) : 0,
             totalRounds: this.state.rounds.length,
             rounds: this.state.rounds.map((r) => this.serializeRound(r))
-        }
+        };
     }
 
     publishGameState() {
-        this.sftw.triggerCallback?.('onNeighborGameStateChange', this.getGameState())
+        this.sftw.triggerCallback?.('onNeighborGameStateChange', this.getGameState());
     }
 
     startTimer() {
-        this.stopTimer()
-        this.state.elapsedTime = 0
+        this.stopTimer();
+        this.state.elapsedTime = 0;
 
         this.state.timerInterval = setInterval(() => {
-            if (!this.state.startTime) return
-            this.state.elapsedTime = Math.floor((performance.now() - this.state.startTime) / 1000)
-            this.publishGameState()
-        }, 1000)
+            if (!this.state.startTime) return;
+            this.state.elapsedTime = Math.floor((performance.now() - this.state.startTime) / 1000);
+            this.publishGameState();
+        }, 1000);
     }
 
     stopTimer() {
         if (this.state.timerInterval) {
-            clearInterval(this.state.timerInterval)
-            this.state.timerInterval = null
+            clearInterval(this.state.timerInterval);
+            this.state.timerInterval = null;
         }
     }
 
     resetState() {
-        this.stopTimer()
-        this.state = this._createInitialState()
+        this.stopTimer();
+        this.state = this._createInitialState();
     }
 
     _evaluateRound(round, parsedAnswers) {
-        const correctSet = new Set(round.correctNeighbors)
-        const matchedSet = new Set()
-        const invalidSet = new Set()
+        const correctSet = new Set(round.correctNeighbors);
+        const matchedSet = new Set();
+        const invalidSet = new Set();
 
         for (const item of parsedAnswers.normalized) {
-            const abbr = this._resolveToAbbr(item)
+            const abbr = this._resolveToAbbr(item);
             if (abbr && correctSet.has(abbr)) {
-                matchedSet.add(abbr)
+                matchedSet.add(abbr);
             } else {
-                invalidSet.add(item)
+                invalidSet.add(item);
             }
         }
 
         const matched = Array.from(matchedSet).sort((a, b) =>
             this._getConstellationDisplayName(a).localeCompare(this._getConstellationDisplayName(b), 'pt-BR')
-        )
+        );
 
         const missing = round.correctNeighbors
             .filter((a) => !matchedSet.has(a))
             .sort((a, b) =>
                 this._getConstellationDisplayName(a).localeCompare(this._getConstellationDisplayName(b), 'pt-BR')
-            )
+            );
 
-        const invalid = Array.from(invalidSet).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+        const invalid = Array.from(invalidSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
-        return { score: matched.length, matched, missing, invalid }
+        return { score: matched.length, matched, missing, invalid };
     }
 
     _parseAnswerList(inputText) {
-        const raw = String(inputText || '')
+        const raw = String(inputText || '');
         const original = raw
             .split(/[,\n;|]+/g)
             .map((s) => s.trim())
-            .filter(Boolean)
+            .filter(Boolean);
 
-        const normalized = []
-        const seen = new Set()
+        const normalized = [];
+        const seen = new Set();
 
         for (const token of original) {
-            const norm = this._normalize(token)
-            if (!norm || seen.has(norm)) continue
-            seen.add(norm)
-            normalized.push(norm)
+            const norm = this._normalize(token);
+            if (!norm || seen.has(norm)) continue;
+            seen.add(norm);
+            normalized.push(norm);
         }
 
-        return { original, normalized }
+        return { original, normalized };
     }
 
     _resolveToAbbr(normalizedText) {
-        if (!normalizedText) return null
+        if (!normalizedText) return null;
 
-        const all = this.sftw.constellations || []
+        const all = this.sftw.constellations || [];
 
         for (const c of all) {
-            const names = new Set()
+            const names = new Set();
 
-            if (c.abbreviation) names.add(this._normalize(c.abbreviation))
-            if (c.name) names.add(this._normalize(c.name))
+            if (c.abbreviation) names.add(this._normalize(c.abbreviation));
+            if (c.name) names.add(this._normalize(c.name));
             if (Array.isArray(c.aliases)) {
-                for (const a of c.aliases) names.add(this._normalize(a))
+                for (const a of c.aliases) names.add(this._normalize(a));
             }
-            if (c.fullName) names.add(this._normalize(c.fullName))
-            if (c.latinName) names.add(this._normalize(c.latinName))
-            if (c.portugueseName) names.add(this._normalize(c.portugueseName))
+            if (c.fullName) names.add(this._normalize(c.fullName));
+            if (c.latinName) names.add(this._normalize(c.latinName));
+            if (c.portugueseName) names.add(this._normalize(c.portugueseName));
 
             if (names.has(normalizedText)) {
-                return c.abbreviation
+                return c.abbreviation;
             }
         }
 
-        return null
+        return null;
     }
 
     _getEligibleConstellations() {
-        const list = this.sftw.constellations || []
+        const list = this.sftw.constellations || [];
         return list
             .filter((c) => c && c.abbreviation)
             .filter((c) => this._getNeighbors(c.abbreviation).length > 0)
-            .map((c) => c.abbreviation)
+            .map((c) => c.abbreviation);
     }
 
     _getNeighbors(abbr) {
         if (typeof this.sftw.getConstellationNeighbors === 'function') {
-            const arr = this.sftw.getConstellationNeighbors(abbr) || []
+            const arr = this.sftw.getConstellationNeighbors(abbr) || [];
             return arr.slice().sort((a, b) =>
                 this._getConstellationDisplayName(a).localeCompare(this._getConstellationDisplayName(b), 'pt-BR')
-            )
+            );
         }
 
-        const c = (this.sftw.constellations || []).find((x) => x.abbreviation === abbr)
-        const arr = c?.neighbors || []
+        const c = (this.sftw.constellations || []).find((x) => x.abbreviation === abbr);
+        const arr = c?.neighbors || [];
         return arr.slice().sort((a, b) =>
             this._getConstellationDisplayName(a).localeCompare(this._getConstellationDisplayName(b), 'pt-BR')
-        )
+        );
     }
 
     _getConstellationDisplayName(abbr) {
-        const c = (this.sftw.constellations || []).find((x) => x.abbreviation === abbr)
-        return c?.name || abbr
+        const c = (this.sftw.constellations || []).find((x) => x.abbreviation === abbr);
+        return c?.name || abbr;
     }
 
     serializeRound(round) {
@@ -852,7 +959,7 @@ class Sftw1_NeighborGameMode {
             submittedRaw: round.submittedRaw.slice(),
             submittedNormalized: round.submittedNormalized.slice(),
             submittedAt: round.submittedAt
-        }
+        };
     }
 
     _normalize(str) {
@@ -860,15 +967,15 @@ class Sftw1_NeighborGameMode {
             .trim()
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
+            .toLowerCase();
     }
 
     _shuffle(arr) {
         for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1))
-            ;[arr[i], arr[j]] = [arr[j], arr[i]]
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
         }
-        return arr
+        return arr;
     }
 }
 
@@ -908,6 +1015,8 @@ if (typeof window !== 'undefined') {
             sftwInstance.submitTargetAnswer = (...args) => games.constellation.submitTargetAnswer(...args);
             sftwInstance.handleConstellationClick = (...args) => games.constellation.handleConstellationClick(...args);
             sftwInstance.registerConstellationAttempt = (...args) => games.constellation.registerAttempt(...args);
+            sftwInstance.showAnswerKey = () => games.constellation.showAnswerKey();
+            sftwInstance.getConstellationAnswerKey = () => games.constellation.getAnswerKey();
 
             // Alias mais explícitos
             sftwInstance.startConstellationGame = (abbr, options = {}) => games.constellation.startGame(abbr, options);
@@ -932,5 +1041,5 @@ if (typeof window !== 'undefined') {
         };
     }
 
-    console.log('✅ Sftw1_Games.js carregado (v4.2)');
+    console.log('✅ Sftw1_Games.js carregado (v4.3)');
 }
